@@ -10,10 +10,10 @@
 ## Environment Variables Configuration
 ### Export your environment credentials to initialize the background tracking engines:
 
-**export LANGFUSE_PUBLIC_KEY="pk-lf-..."
-**export LANGFUSE_SECRET_KEY="sk-lf-..."
-**export LANGFUSE_HOST="https://cloud.langfuse.com"
-**export MLFLOW_TRACKING_URI="http://localhost:5000"
+** *export LANGFUSE_PUBLIC_KEY="pk-lf-..."
+** *export LANGFUSE_SECRET_KEY="sk-lf-..."
+** *export LANGFUSE_HOST="https://cloud.langfuse.com"
+** *export MLFLOW_TRACKING_URI="http://localhost:5000"
 
 ---
 
