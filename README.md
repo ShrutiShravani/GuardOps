@@ -1,4 +1,5 @@
 ## GuardOps: Domain-Agnostic Runtime Guardrails & Automated Evaluation Pipelines
+### It intercepts runtime signals from probabilistic systems (LLMs, RAG, agents, OCR pipelines), enforces deterministic policies, triggers safe fallbacks, and converts production failures into evaluation datasets.
 
 * GuardOps is an open-source, production-grade MLOps middleware framework designed to wrap volatile, probabilistic AI layers (LLM Agents, RAG retrieval paths, or complex data extraction nodes) in a strict, deterministic software shield.
 
