@@ -21,10 +21,11 @@
 
 **graph LR
     * Runtime[Runtime Traces] -->|Filter| Langfuse[Langfuse API]
+    
     * Langfuse -->|Extract| MLflow[MLflow Artifact Store]
+    
     * MLflow -->|Regression| Offline[Offline Test]
 
----
 
 * Rather than manual log auditing, GuardOps pipelines telemetry directly into your model optimization lifecycle:
 
