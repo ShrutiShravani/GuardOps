@@ -1,4 +1,4 @@
-##GuardOps: Domain-Agnostic Runtime Guardrails & Automated Evaluation Pipelines
+## GuardOps: Domain-Agnostic Runtime Guardrails & Automated Evaluation Pipelines
 
 **GuardOps is an open-source, production-grade MLOps middleware framework designed to wrap volatile, probabilistic AI layers (LLM Agents, RAG retrieval paths, or complex data extraction nodes) in a strict, deterministic software shield.
 
@@ -8,7 +8,7 @@
 
 
 ## Environment Variables Configuration
-###Export your environment credentials to initialize the background tracking engines:
+### Export your environment credentials to initialize the background tracking engines:
 
 **export LANGFUSE_PUBLIC_KEY="pk-lf-..."
 **export LANGFUSE_SECRET_KEY="sk-lf-..."
@@ -17,7 +17,8 @@
 
 ---
 
-##🎯Universal Core Implementation Matrix
+## Universal Core Implementation Matrix
+
 **The core GuardOps utility operates on abstract system conditions, making it deployable across any software pipeline without internal code changes:
 
 **The included master notebook (notebooks/guardops_universal_cookbook.ipynb) demonstrates how this engine scales across distinct architectural scenarios, such as:
@@ -30,7 +31,7 @@
 
 ---
 
-##📉Continuous Retraining & Evaluation Loop
+## 📉Continuous Retraining & Evaluation Loop
 
 **graph LR
     **Runtime[Runtime Traces] -->|Filter| Langfuse[Langfuse API]
