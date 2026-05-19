@@ -1,5 +1,6 @@
-**GuardOps: Domain-Agnostic Runtime Guardrails & Automated Evaluation Pipelines
-GuardOps is an open-source, production-grade MLOps middleware framework designed to wrap volatile, probabilistic AI layers (LLM Agents, RAG retrieval paths, or complex data extraction nodes) in a strict, deterministic software shield.
+##GuardOps: Domain-Agnostic Runtime Guardrails & Automated Evaluation Pipelines
+
+**GuardOps is an open-source, production-grade MLOps middleware framework designed to wrap volatile, probabilistic AI layers (LLM Agents, RAG retrieval paths, or complex data extraction nodes) in a strict, deterministic software shield.
 
 **When production systems scale to 100k+ documents and face high-volume, unseen query traffic, AI models inevitably suffer from semantic drift, hallucination, and boundary degradation. While tools like Langfuse provide excellent telemetry logging and MLflow excels at tracking model experiments, engineering teams struggle to bridge the structural gap between runtime failures and continuous evaluation data loops.
 
@@ -8,14 +9,15 @@ GuardOps is an open-source, production-grade MLOps middleware framework designed
 
 ## Environment Variables Configuration
 ###Export your environment credentials to initialize the background tracking engines:
-** export LANGFUSE_PUBLIC_KEY="pk-lf-..."
-** export LANGFUSE_SECRET_KEY="sk-lf-..."
-** export LANGFUSE_HOST="https://cloud.langfuse.com"
-** export MLFLOW_TRACKING_URI="http://localhost:5000"
+
+**export LANGFUSE_PUBLIC_KEY="pk-lf-..."
+**export LANGFUSE_SECRET_KEY="sk-lf-..."
+**export LANGFUSE_HOST="https://cloud.langfuse.com"
+**export MLFLOW_TRACKING_URI="http://localhost:5000"
 
 ---
 
-🎯 Universal Core Implementation Matrix
+##🎯Universal Core Implementation Matrix
 **The core GuardOps utility operates on abstract system conditions, making it deployable across any software pipeline without internal code changes:
 
 **The included master notebook (notebooks/guardops_universal_cookbook.ipynb) demonstrates how this engine scales across distinct architectural scenarios, such as:
@@ -26,12 +28,14 @@ GuardOps is an open-source, production-grade MLOps middleware framework designed
 
 **Operational Logistics: Clamping dynamic pricing/value calculations against baseline margin floors.
 
-📉 Continuous Retraining & Evaluation Loop
+---
+
+##📉Continuous Retraining & Evaluation Loop
 
 **graph LR
-    Runtime[Runtime Traces] -->|Filter| Langfuse[Langfuse API]
-    Langfuse -->|Extract| MLflow[MLflow Artifact Store]
-    MLflow -->|Regression| Offline[Offline Test]
+    **Runtime[Runtime Traces] -->|Filter| Langfuse[Langfuse API]
+    **Langfuse -->|Extract| MLflow[MLflow Artifact Store]
+    **MLflow -->|Regression| Offline[Offline Test]
 
 ---
 
@@ -44,4 +48,6 @@ GuardOps is an open-source, production-grade MLOps middleware framework designed
 **These curated edge cases are frozen inside the MLflow Artifact Store as an evaluation dataset.
 
 **Candidate pipelines and alternative local base models are automatically stress-tested against these historical failure cases to verify regressions before deploying to staging.
+
+
 
