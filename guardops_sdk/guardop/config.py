@@ -18,6 +18,7 @@ class FallbackStrategy(Enum):
     SHORT_CIRCUIT = "SHORT_CIRCUIT"  # Matches your manifest perfectly!
     STATIC_REFUSAL = "STATIC_REFUSAL"
     
+    
 
 @dataclass
 class GuardConfig:

@@ -1,6 +1,7 @@
 import contextvars
 from typing import Optional, Any, List
 from langfuse import Langfuse
+from langfuse import get_client
 from langfuse import propagate_attributes
 import logging
 
@@ -16,7 +17,7 @@ class GuardTelemetry:
     def get_global_client(cls)->Langfuse:
         global langfuse_client
         if langfuse_client is None:
-            langfuse_client = Langfuse()
+            langfuse_client = get_client() 
         return langfuse_client
 
 

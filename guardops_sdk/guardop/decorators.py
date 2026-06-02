@@ -9,6 +9,8 @@ from guardops_sdk.guardop.telemetry import GuardTelemetry, langfuse_client
 from guardops_sdk.guardop.registry import GuardRegistry 
 import mlflow
 from mlflow.tracking import MlflowClient 
+import copy 
+
 
 def guard_runtime(node_name:str):
     """
@@ -39,20 +41,30 @@ def guard_runtime(node_name:str):
             
             start_time= time.monotonic()
             parent_trace_id= GuardTelemetry.get_active_trace()
+            client= GuardTelemetry.get_global_client()
+
+            native_trace_id=None 
+            if parent_trace_id:
+                if isinstance(parent_trace_id,str):
+                    native_trace_id= parent_trace_id
+                else:
+                    native_trace_id= getattr(parent_trace_id,'trace_id',None) or getattr(parent_trace_id,'id',None)
 
             ctx_manager=None
-            
+            raw_input_snapshot = copy.deepcopy(payload)
+            original_payload = {k: v for k, v in raw_input_snapshot.items() if k not in ["tenant_id", "mlflow_run_id"]}
             waybill_id=payload.get("payload_id","UNKNOWN")
+            
             client= GuardTelemetry.get_global_client()
 
             run_id= payload.get("mlflow_run_id")
             mlflow_client= MlflowClient() if run_id else None
-
+            
             if parent_trace_id:
                 ctx_manager = client.start_as_current_observation(
                     name=f"NodeExecution:{node_name}",
                     as_type="span",
-                    input=payload
+                    input= raw_input_snapshot
                 )
                 ctx_manager.__enter__()
 
@@ -62,6 +74,7 @@ def guard_runtime(node_name:str):
                     result_payload = await func(*args, **kwargs)
                 else:
                     result_payload = func(*args, **kwargs)
+                raw_agent_output = copy.deepcopy(result_payload)
 
                 active_rules = GuardRegistry.get_rules_for_node(node_name)
                 pre_eval_states = {
@@ -83,59 +96,99 @@ def guard_runtime(node_name:str):
                     post_val = GuardRegistry.extract_value_by_path(safeguarded_payload, rule.metric_key)
                     
                     if pre_val is not None and pre_val!=post_val:
+                        triggered_overrides[rule.metric_key]={
+                            "original_value":pre_val,
+                            "safe_fallback_value":post_val,
+                            "policy_rule_tag": rule.breach_tag
+                        }
 
                         if mlflow_client and run_id:
                             # Log real-time parameter shifting to MLflow dashboard
                             mlflow_client.log_metric(run_id,f"override_triggered_{node_name}", 1.0)
                             mlflow_client.log_param(run_id,f"{node_name}_{rule.metric_key}_breached_metric_key","DATA_OVERRIDE_TRIGGERED")
-                            mlflow_client.log_param(run_id,f"{node_name}_{rule.metric_key}_original_untrusted_value", (pre_val))
-                            mlflow_client.log_param(run_id,f"{node_name}_{rule.metric_key}_replaced_safe_value", (post_val))
-
-                            
-                            # Export the exact breached payload to a local folder to log as an MLflow retraining artifact
-                            artifact_path = f"mlflow_retrain_data/{node_name}_override_{waybill_id}.json"
-                            os.makedirs("mlflow_retrain_data", exist_ok=True)
-                            with open(artifact_path, "w") as f:
-                                json.dump({"breached_input": payload, "applied_output": safeguarded_payload}, f, indent=2)
-                            
-                            # Log the file as an artifact inside MLflow so data scientists can access it for training
-                            mlflow_client.log_artifact(run_id,artifact_path, artifact_path="breached_retraining_payloads")
-                    triggered_overrides[rule.metric_key]={
-                        "original_value":pre_val,
-                        "safe_fallback_value":post_val,
-                        "policy_rule_tag": rule.breach_tag
+                            #mlflow_client.log_param(run_id,f"{node_name}_{rule.metric_key}_original_untrusted_value", (pre_val))
+                           # mlflow_client.log_param(run_id,f"{node_name}_{rule.metric_key}_replaced_safe_value", (post_val))
+                
+                if triggered_overrides and mlflow_client and run_id:
+                    clean_log={
+                        "node_name": node_name,
+                        "intervention_type": "DATA_OVERRIDE",
+                        "applied_overrides": triggered_overrides,
+                        "sanitized_payload": {
+                            k: v for k, v in safeguarded_payload.items() 
+                            if k not in ["tenant_id", "mlflow_run_id"]
+                        }
                     }
 
+                            
+                    # Export the exact breached payload to a local folder to log as an MLflow retraining artifact
+                    artifact_path = f"mlflow_retrain_data/{node_name}_override_{waybill_id}.json"
+                    os.makedirs("mlflow_retrain_data", exist_ok=True)
+                    with open(artifact_path, "w") as f:
+                        json.dump({"breached_input": original_payload, "applied_output": clean_log}, f, indent=2)
+                    
+                    # Log the file as an artifact inside MLflow so data scientists can access it for training
+                    mlflow_client.log_artifact(run_id,artifact_path, artifact_path="breached_retraining_payloads")
+                 
+
                 if ctx_manager:
-                    client.update_current_span(output=safeguarded_payload)
-                    
-                    actual_trace_string_id = ""
+                    current_span_id= getattr(ctx_manager,"id",None)
 
-                    if parent_trace_id:
-                        actual_trace_string_id = parent_trace_id if isinstance(parent_trace_id,str) else getattr(parent_trace_id,'id',parent_trace_id)
-                    
-                    if triggered_overrides:
-                        client.update_current_span(
-                            output= safeguarded_payload,
-                            metadata={"shield_intervention_logged":True,"applied_mutations":triggered_overrides}
-                        )
-
+                    client.update_current_span(
+                        input=raw_input_snapshot,
+                        output= safeguarded_payload,
+                        metadata={"shield_intervention_logged":bool(triggered_overrides),"intervention_type": "DATA_OVERRIDE" if triggered_overrides else "CLEAN_EXECUTION","applied_mutations":triggered_overrides}
+                    )
+                    """
+                    if triggered_overrides and native_trace_id:
+                        active_trace_id = getattr(ctx_manager, "trace_id", None) or native_trace_id
+                        active_span_id = getattr(ctx_manager, "id", None)
+                      
+                        print(native_trace_id)
+                        time.sleep(0.5)
+                        # note -The scoring hooks below are structurally correct but temporarily deactivated 
+                        # to bypass a known Langfuse backend asynchronous race condition where score REST updates 
+                        # intermittently mismatch with the active OpenTelemetry ingestion worker stream.
+                        # All critical audit trails remain fully captured inside the metadata.applied_mutations schema.
+                        
                         client.create_score(
-                            trace_id=str(actual_trace_string_id),
                             name="Data_Correction_Applied",
                             value=1.0,
-                            comment=f"Corrected fields: {list(triggered_overrides.keys())}"
+                            trace_id=active_trace_id,
+                            observation_id=active_span_id,
+                            comment=f"Node '{node_name}'Corrected fields: {list(triggered_overrides.keys())}"
                         )
-                    else:
-                        client.update_current_span(output=safeguarded_payload)
-                      
+                        print("scoreS_logged")
+                      """
+                    
                 return safeguarded_payload
             
             except GuardOpsRefusalIntercept as intercept:
                 duration= time.monotonic()-start_time
                 if mlflow_client and run_id:
                     mlflow_client.log_metric(run_id, f"critical_policy_violation_{node_name}", 1.0)
-                    mlflow_client.log_param(run_id, f"{node_name}_short_circuit_tag", intercept.breach_tag)
+                    
+                    
+                    target_error_state= raw_agent_output if 'raw_agent_output' in locals() else raw_input_snapshot
+
+                    clean_sc_payload={
+                        "node_name": node_name,
+                        "intervention_type": "SHORT_CIRCUIT",
+                        "breach_tag": intercept.breach_tag,
+                        "fallback_message": intercept.fallback_message,
+                        "halted_at_state": {
+                            k: v for k, v in target_error_state.items() 
+                            if k not in ["tenant_id", "mlflow_run_id"]
+                        }
+
+                    }
+                    artifact_path = f"mlflow_retrain_data/{node_name}_override_{waybill_id}.json"
+                    os.makedirs("mlflow_retrain_data", exist_ok=True)
+                    with open(artifact_path, "w") as f:
+                        json.dump({"breached_input": original_payload, "applied_output": clean_sc_payload}, f, indent=2)
+                    
+                    # Log the file as an artifact inside MLflow so data scientists can access it for training
+                    mlflow_client.log_artifact(run_id,artifact_path, artifact_path="breached_retraining_payloads")
 
         
                 payload["status"] = "BLOCKED_BY_GUARDOP_POLICY"
@@ -146,13 +199,15 @@ def guard_runtime(node_name:str):
                     payload["agent_trace"].append(f"[POLICY INTERCEPT] Node '{node_name}': {intercept.breach_tag}")
 
                 if ctx_manager:
-                    client.update_current_span(output={"status": "INTERCEPTED", "reason": intercept.breach_tag})
-                    ctx_manager.__exit__(type(intercept), intercept, intercept.__traceback__)
-                    
-                    current_id = parent_trace_id if isinstance(parent_trace_id, str) else getattr(parent_trace_id, 'id', str(parent_trace_id))
-                    client.create_score(trace_id=current_id, name="Security_Policy_Violation", value=1.0, comment=intercept.breach_tag)
-                    client.create_score(trace_id=current_id, name=f"{node_name}_latency", value=duration)
-
+                    current_span_id= getattr(ctx_manager,"id",None)
+                    client.update_current_span(input=raw_input_snapshot,output={"status": "INTERCEPTED", "reason": intercept.breach_tag})
+                 
+                    """
+                    if native_trace_id:
+                        time.sleep(0.5)
+                        print(native_trace_id)
+                        client.create_score(trace_id=native_trace_id,observation_id=current_span_id,name="Security_Policy_Violation", value=1.0, comment=f"Halted at node '{node_name}' via rule tag: {intercept.breach_tag}")
+                    """
                 return payload
             
             finally:

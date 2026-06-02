@@ -26,7 +26,7 @@ async def execute_critic_agent(payload:dict)->dict:
     return payload
 
 @guard_runtime(node_name="LLM_Output_Generation_Node")
-async def exceute_llm_generation(payload:dict)->dict:
+async def execute_llm_generation(payload:dict)->dict:
     print("   [NODE EXECUTION] LLM_Output_Generation_Node evaluating rules...")
     await asyncio.sleep(0.05)
     return payload
@@ -85,7 +85,7 @@ async def worker_conductor(payload_id:str,tenant_id:str,simulated_data:dict):
             payload= sanitize_payload(payload)
             return payload
 
-        payload= await exceute_llm_generation(payload)
+        payload= await execute_llm_generation(payload)
         if payload.get("status")=="BLOCKED_BY_GUARDOP_POLICY":
             print(f"[BYPASS TRIGGERED] Short-Circuit at LLM Generation Node. Halting execution pipeline.")
             client.set_terminated(run_id, status="KILLED")

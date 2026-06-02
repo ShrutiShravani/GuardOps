@@ -51,7 +51,7 @@ class GuardExecutionEngine:
             #run mathematical and validation pattern checks
 
             # Run mathematical and validation pattern checks
-            if cls._check_condition(current_value, rule.condition_type, rule.boundary_limit):
+            if cls._check_condition(current_value, rule.condition_type, rule):
                 
                 # ─── CASE A: LOCAL NODE OVERRIDE (Fix-and-Continue) ───
                 if rule.strategy == FallbackStrategy.DATA_OVERRIDE:
@@ -66,19 +66,24 @@ class GuardExecutionEngine:
                         fallback_message=str(rule.fallback_value),
                         breach_tag=rule.breach_tag
                     )
+                
                     
         return payload
 
     @staticmethod
-    def _check_condition(value: Any, condition_type: ConditionType, boundary: Any) -> bool:
+    def _check_condition(value: Any, condition_type: ConditionType, rule: Any) -> bool:
         """Evaluates thresholds against active application values."""
         try:
             if condition_type == ConditionType.OVER_CEILING:
-                return float(value) > float(boundary)
+                return float(value) > float(rule.boundary)
             elif condition_type == ConditionType.UNDER_FLOOR:
-                return float(value) < float(boundary)
+                return float(value) < float(rule.boundary)
             elif condition_type == ConditionType.REGEX_MISMATCH:
-                return not bool(re.match(str(boundary), str(value)))
+                return not bool(re.match(str(rule.boundary), str(value)))
+            elif str(condition_type)=="SEMANTIC_BEHAVIORAL_VIOLATION":
+                eval_path = getattr(rule,"evaluator_type",None)
+
+                if eval_path and "." 
         except (ValueError, TypeError):
             # Fail-closed policy: treat malformed data as a data threat breach
             return True 

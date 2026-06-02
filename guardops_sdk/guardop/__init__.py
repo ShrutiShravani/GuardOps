@@ -9,15 +9,15 @@ numerical thresholds, regular expression strings, and context retrieval payloads
 __version__="v1"
 __author__ = "Shruti"
 
-from guardops_sdk.guardops.config import (
+from guardops_sdk.guardop.config import (
     GuardConfig,
     ConditionType,
     FallbackStrategy
 )
-from guardops_sdk.guardops.registry import GuardRegistry
+from guardops_sdk.guardop.registry import GuardRegistry
 
 # 2. Expose the core execution mechanisms and exception classes
-from guardops_sdk.guardops.decorators import (
+from guardops_sdk.guardop.decorators import (
     guard_runtime,
     GuardOpsRefusalIntercept
 )
