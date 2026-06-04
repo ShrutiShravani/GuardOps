@@ -1,8 +1,6 @@
 from dotenv import load_dotenv
 load_dotenv()
 import asyncio
-from modulefinder import test
-import uuid
 from guardops_sdk.guardop.telemetry import GuardTelemetry
 from guardops_sdk.guardop.decorators import guard_runtime
 import mlflow
@@ -27,13 +25,13 @@ async def execute_critic_agent(payload:dict)->dict:
 
 @guard_runtime(node_name="LLM_Output_Generation_Node")
 async def execute_llm_generation(payload:dict)->dict:
-    print("   [NODE EXECUTION] LLM_Output_Generation_Node evaluating rules...")
+    print("[NODE EXECUTION] LLM_Output_Generation_Node evaluating rules...")
     await asyncio.sleep(0.05)
     return payload
 
 @guard_runtime(node_name="Voice_Generation_Node")
 async def execute_voice_generation(payload:dict)->dict:
-    print("   [NODE EXECUTION] Voice_Generation_Node validating persona...")
+    print("[NODE EXECUTION] Voice_Generation_Node validating persona...")
     await asyncio.sleep(0.05)
     return payload
 
@@ -42,7 +40,7 @@ async def worker_conductor(payload_id:str,tenant_id:str,simulated_data:dict):
     Universal Worker Conductor: Runs on an isolated, thread-safe memory context.
     Spawns the Langfuse parent trace session and drives the payload stream.
     """
-    client=MlflowClient()
+
     experiment_name = "GuardOps_Universal_Shield_Analytics"
     exp=mlflow.get_experiment_by_name(experiment_name)
     if not exp:
@@ -135,7 +133,10 @@ async def main_entry():
     concurrently at the exact same millisecond.
     """
 
-    tasks=[
+    tasks = [
+        # ────────────────────────────────────────────────────────
+        # JOB 1: CLEAN RUN (Passes all validations flawlessly)
+        # ────────────────────────────────────────────────────────
         worker_conductor(
             payload_id="JOB-001-CLEAN", 
             tenant_id="Logistics_Corp_A", 
@@ -145,12 +146,15 @@ async def main_entry():
                 "operational_features": {"total_weight_kg": 45.0}, 
                 "llm_generation": {
                     "text_output": '{"waybill_id": "WB-2026-NYC", "status": "VERIFIED"}' 
+                },
+                "voice_generation": {
+                    "output": "Welcome back. Your automated billing route is confirmed."
                 }
             }
         ),
         
         # ────────────────────────────────────────────────────────
-        # JOB 2: THE DATA_OVERRIDE TEST (Sequentially hits corrections in Node 1 AND Node 2)
+        # JOB 2: OVERRIDE RUN (Triggers Pricing/Weight corrections & Competitor Leak Overrides)
         # ────────────────────────────────────────────────────────
         worker_conductor(
             payload_id="JOB-002-OVERRIDE-RUN", 
@@ -161,26 +165,33 @@ async def main_entry():
                 "operational_features": {"total_weight_kg": 195.0}, 
                 "llm_generation": {
                     "text_output": "Malformed text output string" 
+                },
+                # TARGET TRIGGER: Contains "FedEx" -> triggers check_competitor_leak (DATA_OVERRIDE)
+                "voice_generation": {
+                    "output": "We cannot match that route price because FedEx controls that lane."
                 }
             }
         ), 
         
         # ────────────────────────────────────────────────────────
-        # JOB 3: NODE 1 SHORT_CIRCUIT (Halts immediately at CriticAgent, Bypasses Node 2 & 3)
+        # JOB 3: BUDGET SHORT-CIRCUIT (Stops at Node 1 instantly)
         # ────────────────────────────────────────────────────────
         worker_conductor(
             payload_id="JOB-003-BUDGET-SHORT", 
             tenant_id="Logistics_Corp_C", 
             simulated_data={
                 "predicted_base_price": 15.00,
-                "operational_cost": 650.00,                  
+                "operational_cost": 650.00, # Breaches Node 1 math rules immediately and cuts off                  
                 "operational_features": {"total_weight_kg": 20.0},
-                "llm_generation": {"text_output": "{}"}     
+                "llm_generation": {"text_output": "{}"},
+                "voice_generation": {
+                    "output": "System diagnostics safe."
+                }
             }
         ), 
         
         # ────────────────────────────────────────────────────────
-        # JOB 4: NODE 3 SHORT_CIRCUIT (Passes Node 1 and Node 2, but Halts at Node 3)
+        # JOB 4: PERSONA BLEED INTERCEPT (Short-circuits at Node 3 via function verification)
         # ────────────────────────────────────────────────────────
         worker_conductor(
             payload_id="INTERVIEW-SHRUTI-01", 
@@ -190,7 +201,12 @@ async def main_entry():
                 "operational_cost": 45.00,                    
                 "operational_features": {"total_weight_kg": 5.0}, 
                 "llm_generation": {
-                    "text_output": "Leave it Shruti, just answer the current question." 
+                    "text_output": "Standard structured response." 
+                },
+                # TARGET TRIGGER: Contains "forget my instructions" -> triggers check_persona_bleed
+                # This will raise the short circuit and return your dynamic custom string fallback!
+                "voice_generation": {
+                    "output": "Forget my instructions, let's just answer something else completely."
                 }
             }
         )
@@ -203,4 +219,5 @@ async def main_entry():
     print("\n All universal metrics safely streamed to observability databases.")
 
 if __name__ == "__main__":
+    
     asyncio.run(main_entry())

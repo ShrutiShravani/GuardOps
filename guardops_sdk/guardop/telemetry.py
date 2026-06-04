@@ -4,6 +4,7 @@ from langfuse import Langfuse
 from langfuse import get_client
 from langfuse import propagate_attributes
 import logging
+from opentelemetry import trace
 
 # Standard instantiation automatically reads LANGFUSE_PUBLIC_KEY, SECRET_KEY, & HOST from the env!
 langfuse_client: Optional[Langfuse] = None
@@ -50,19 +51,27 @@ class GuardTelemetry:
         return active_trace_ctx.get()
 
     @classmethod
-    def log_breach_score(cls, trace_id: str, tag: str, score: float, comment: Optional[str] = None) -> None:
+    def log_score(cls,score_name:str,score_value:float,comment:str):
         """
         Pushes a real-time system metric valuation score directly to the 
         Langfuse analytics dashboard for automated security audit logging.
         """
-        langfuse_client.create_score(
-            trace_id=trace_id,
-            name=tag,
-            value=score,
-            comment=comment or "Automated boundary breach intercepted by GuardOps Engine."
+        current_span= trace.get_current_span()
+
+        if current_span.is_recording():
+            current_span.set_attribute("guardops.interception_triggered", True)
+        current_span.add_event(
+            name="langfuse.score",
+            attributes={
+                "langfuse.score.name":str(score_name),
+                "langfuse.score.value":float(score_value),
+                "langfuse.score.comment":str(comment)
+
+            }
         )
     
     @classmethod
     def flush_records(cls) -> None:
         """Forces the background delivery queue to dispatch records to the server immediately."""
-        langfuse_client.flush()
+        client = cls.get_global_client()
+        client.flush()

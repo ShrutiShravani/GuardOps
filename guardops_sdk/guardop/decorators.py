@@ -5,11 +5,12 @@ import json
 import os
 from typing import Dict, Any, Callable
 from guardops_sdk.guardop.engine import GuardExecutionEngine, GuardOpsRefusalIntercept
-from guardops_sdk.guardop.telemetry import GuardTelemetry, langfuse_client
+from guardops_sdk.guardop.telemetry import GuardTelemetry
 from guardops_sdk.guardop.registry import GuardRegistry 
 import mlflow
 from mlflow.tracking import MlflowClient 
 import copy 
+
 
 
 def guard_runtime(node_name:str):
@@ -132,39 +133,25 @@ def guard_runtime(node_name:str):
                  
 
                 if ctx_manager:
-                    current_span_id= getattr(ctx_manager,"id",None)
-
                     client.update_current_span(
                         input=raw_input_snapshot,
                         output= safeguarded_payload,
                         metadata={"shield_intervention_logged":bool(triggered_overrides),"intervention_type": "DATA_OVERRIDE" if triggered_overrides else "CLEAN_EXECUTION","applied_mutations":triggered_overrides}
                     )
-                    """
+                    
                     if triggered_overrides and native_trace_id:
-                        active_trace_id = getattr(ctx_manager, "trace_id", None) or native_trace_id
-                        active_span_id = getattr(ctx_manager, "id", None)
-                      
-                        print(native_trace_id)
-                        time.sleep(0.5)
-                        # note -The scoring hooks below are structurally correct but temporarily deactivated 
-                        # to bypass a known Langfuse backend asynchronous race condition where score REST updates 
-                        # intermittently mismatch with the active OpenTelemetry ingestion worker stream.
-                        # All critical audit trails remain fully captured inside the metadata.applied_mutations schema.
                         
-                        client.create_score(
-                            name="Data_Correction_Applied",
-                            value=1.0,
-                            trace_id=active_trace_id,
-                            observation_id=active_span_id,
+                        GuardTelemetry.log_score(
+                            score_name="Data_Override",
+                            score_value=1.0,
                             comment=f"Node '{node_name}'Corrected fields: {list(triggered_overrides.keys())}"
                         )
-                        print("scoreS_logged")
-                      """
+                        print("scores_logged")
+                      
                     
                 return safeguarded_payload
             
             except GuardOpsRefusalIntercept as intercept:
-                duration= time.monotonic()-start_time
                 if mlflow_client and run_id:
                     mlflow_client.log_metric(run_id, f"critical_policy_violation_{node_name}", 1.0)
                     
@@ -199,15 +186,11 @@ def guard_runtime(node_name:str):
                     payload["agent_trace"].append(f"[POLICY INTERCEPT] Node '{node_name}': {intercept.breach_tag}")
 
                 if ctx_manager:
-                    current_span_id= getattr(ctx_manager,"id",None)
                     client.update_current_span(input=raw_input_snapshot,output={"status": "INTERCEPTED", "reason": intercept.breach_tag})
                  
-                    """
-                    if native_trace_id:
-                        time.sleep(0.5)
-                        print(native_trace_id)
-                        client.create_score(trace_id=native_trace_id,observation_id=current_span_id,name="Security_Policy_Violation", value=1.0, comment=f"Halted at node '{node_name}' via rule tag: {intercept.breach_tag}")
-                    """
+                    
+                    GuardTelemetry.log_score(score_name="Short_Circuit", score_value=1.0, comment=f"Halted at node '{node_name}' via rule tag: {intercept.breach_tag}")
+                
                 return payload
             
             finally:

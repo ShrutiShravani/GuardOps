@@ -137,3 +137,40 @@ The final step is formatting the data so external platforms can consume it perfe
 The Observability Stream (Langfuse): You think: "What does an operations team need to see live?" They need to see trace paths, latency, and system health. You design this adapter to map your ContextVars (like trace_id and node names) directly into Langfuse spans so the live execution path is fully auditable.
 
 The Data Science Stream (MLflow): You think: "What does a machine learning engineer need to retrain a model next month?" They don't care about live spans; they need a clean, structured table of every "hard query" that caused a RAG or pricing breach. You design this adapter to bypass MLflow’s loose parameter logging and instead append data directly into highly accurate, structured CSV/Parquet files registered as versioned testing datasets.
+
+Markdown
+### Advanced Extensibility: Moving Beyond Simple RegEx / Keyword Guards
+
+Because the `GuardExecutionEngine` resolves string configurations to executable blocks dynamically via reflection, developers can swap simple phrase checking for a live LLM-As-A-Judge evaluator or a network-connected dynamic fallback corrector without touching the engine's core infrastructure.
+
+#### Example: Implementing an LLM-As-A-Judge Guard Function
+
+Users can register a custom guard function in `manifest.json` pointing to a file containing an evaluation model call:
+
+```python
+def check_persona_bleed_llm_judge(text_to_check: str, rule_config: dict) -> bool:
+    """
+    [LLM-As-A-Judge Architecture Example]
+    Evaluates agent output semantically against a breach profile via an external utility model.
+    """
+    breach_tag = rule_config.get("breach_tag", "GENERIC_BEHAVIORAL_DRIFT")
+    
+    evaluator_prompt = f"""
+    [SYSTEM JUDGE EVALUATOR]
+    Analyze if the generated text completely breaks agent formatting rules or persona bounds.
+    Violation Context Profile: {breach_tag}
+    Generated Text to Inspect: "{text_to_check}"
+    
+    Output rules: Reply exactly 'True' if it breaks boundary limits, or 'False' if it adheres.
+    """
+    
+    # In production deployment, connect this directly to an ultra-fast inference client:
+    # response = client.chat.completions.create(model="gpt-4o-mini", messages=[...])
+    # return "true" in response.choices[0].message.content.lower()
+    
+    untrusted_text = text_to_check.lower()
+    if "forget my instructions" in untrusted_text or "leave it" in untrusted_text:
+        print(" 🤖 [LLM JUDGE EVALUATOR]: Intent drift captured via custom module reflection.")
+        return True
+        
+    return False
