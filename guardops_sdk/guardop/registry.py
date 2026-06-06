@@ -23,15 +23,36 @@ class GuardRegistry:
             cls._registry[node_name]=[]
 
             for rule in rule_list:
-                complied_config=GuardConfig(
-                    metric_key=rule["metric_key"],
-                    condition_type=ConditionType[rule["condition_type"]],
-                    boundary_limit=rule["boundary_limit"],
-                    fallback_value=rule["fallback_value"],
-                    strategy=FallbackStrategy[rule["strategy"]],
-                    breach_tag=rule["breach_tag"]
-                )
-                cls._registry[node_name].append(complied_config)
+                metric_key = rule.get("metric_key")
+                strategy_str= rule.get('strategy')
+                strategy = FallbackStrategy[strategy_str]
+                if "checks" in rule:
+                    for subchecks in rule["checks"]: 
+                        complied_config=GuardConfig(
+                        metric_key=metric_key,
+                        condition_type=ConditionType[subchecks["condition_type"]],
+                        boundary_limit=subchecks["boundary_limit"],
+                        fallback_value=subchecks["fallback_value"],
+                        strategy=strategy,
+                        breach_tag=subchecks["breach_tag"],
+                        parameters=subchecks.get("parameters", {})
+                    )
+                        cls._registry[node_name].append(complied_config)
+                        print(
+                        f"[REGISTRY] {node_name} -> "
+                        f"{[r.breach_tag for r in cls._registry[node_name]]}"
+                    )
+                else:
+                    complied_config=GuardConfig(
+                        metric_key=metric_key,
+                        condition_type=ConditionType[rule["condition_type"]],
+                        boundary_limit=rule["boundary_limit"],
+                        fallback_value=rule["fallback_value"],
+                        strategy=strategy,
+                        breach_tag=rule["breach_tag"],
+                        parameters=rule.get("parameters", {}))
+                    
+                    cls._registry[node_name].append(complied_config)
 
 
     @classmethod

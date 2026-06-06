@@ -57,9 +57,11 @@ class GuardExecutionEngine:
         active_rules:List[GuardConfig]=GuardRegistry.get_rules_for_node(node_name)
         print(f"\n==========================================")
         print(f"[GUARD RUNTIME] Checking Node: '{node_name}'")
-        
+        interventions = []
+
         for rule in active_rules:
             current_value= GuardRegistry.extract_value_by_path(payload,rule.metric_key)
+            old_value=current_value
             if current_value is None:
                 print(f"ℹ[GUARD ENGINE] Skipping rule '{rule.breach_tag}': Key '{rule.metric_key}' not present in this payload.")
                 continue
@@ -88,7 +90,7 @@ class GuardExecutionEngine:
                 print(f"[GUARD ENGINE] Breach detected on node '{node_name}' under tag :{rule.breach_tag}")
                 
                 raw_fallback = rule.fallback_value
-                if isinstance(raw_fallback,str) and "." in raw_fallback:
+                if isinstance(raw_fallback,str) and "." in raw_fallback and " " not in raw_fallback:
                     try:
                         fallback_generator= GuardExecutionEngine.resolve_function(raw_fallback)
                         resolved_fallback_message=fallback_generator(current_value,rule_serializable_config)
@@ -101,6 +103,13 @@ class GuardExecutionEngine:
                 if rule.strategy == FallbackStrategy.DATA_OVERRIDE:
                     # Uses our write pathtool to update the dictionary in memory
                     GuardRegistry.override_value_by_path(payload, rule.metric_key,resolved_fallback_message)
+                    interventions.append({
+                    "node_name": node_name,
+                    "breach_tag": rule.breach_tag,
+                    "metric_key": rule.metric_key,
+                    "original_value": old_value,
+                    "safe_fallback_value": resolved_fallback_message
+                })
                     cls._append_trace(payload, f"[Local Fix] Field '{rule.metric_key}' overrode to safe default.")
                 
                 # ─── CASE B: PIPELINE INTERCEPT (Stop-and-Refuse) ───
@@ -113,8 +122,10 @@ class GuardExecutionEngine:
                 
             else:
                 resolved_fallback_message="No fallback value provided"       
-        return payload
-
+        return {
+    "payload": payload,
+    "interventions": interventions
+}
 
     @staticmethod
     def _check_condition(value: Any, condition_type: ConditionType,rule_serializable_config) -> bool:
@@ -130,11 +141,16 @@ class GuardExecutionEngine:
                 eval_path = rule_serializable_config.get("boundary_limit")
 
                 if eval_path and "." in eval_path:
-                    custom_evaluator_func= GuardExecutionEngine.resolve_function(eval_path)
-
-                    print(f"[GUARD ENGINE] Dynamic Reflection Triggered -> Executing: {eval_path}()")
-                    
-                    return bool(custom_evaluator_func(value,rule_serializable_config))
+                    try:
+                        custom_evaluator_func = GuardExecutionEngine.resolve_function(eval_path)
+                        print(f"[GUARD ENGINE] Dynamic Reflection Triggered -> Executing: {eval_path}()")
+                        
+                        result = bool(custom_evaluator_func(value, rule_serializable_config))
+                        print(f"[DEBUG ENGINE] Custom evaluator function returned: {result}")
+                        return result
+                    except Exception as reflection_err:
+                        print(f"[GUARD CRITICAL] Failed to resolve/execute custom function '{eval_path}': {reflection_err}")
+                        return False # Escapes rule safely if code path itself is broken
 
                 print("[GUARD WARNING] SEMANTIC_BEHAVIORAL_VIOLATION rule found but no valid 'evaluator_type' path provided.")
                 return False

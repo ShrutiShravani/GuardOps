@@ -10,15 +10,12 @@ class ConditionType(Enum):
     UNDER_FLOOR = "UNDER_FLOOR"
     OVER_CEILING = "OVER_CEILING"
     REGEX_MISMATCH = "REGEX_MISMATCH"
-    NOT_IN_SET = "NOT_IN_SET"
-    SCHEMA_MISSING_KEYS = "MISSING_KEYS"
+    CUSTOM_CHECK= "CUSTOM_CHECK"
 
 class FallbackStrategy(Enum):
     DATA_OVERRIDE = "DATA_OVERRIDE"
-    SHORT_CIRCUIT = "SHORT_CIRCUIT"  # Matches your manifest perfectly!
-    STATIC_REFUSAL = "STATIC_REFUSAL"
-    
-    
+    SHORT_CIRCUIT = "SHORT_CIRCUIT" 
+
 
 @dataclass
 class GuardConfig:
@@ -33,4 +30,5 @@ class GuardConfig:
     strategy:FallbackStrategy=FallbackStrategy.SHORT_CIRCUIT
     breach_tag: str="GUARDOPS_BREACH_WARNING"
     metadata:dict=field(default_factory=dict)
+    parameters: Dict[str, Any] = field(default_factory=dict)
 

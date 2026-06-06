@@ -146,9 +146,6 @@ async def main_entry():
                 "operational_features": {"total_weight_kg": 45.0}, 
                 "llm_generation": {
                     "text_output": '{"waybill_id": "WB-2026-NYC", "status": "VERIFIED"}' 
-                },
-                "voice_generation": {
-                    "output": "Welcome back. Your automated billing route is confirmed."
                 }
             }
         ),
@@ -165,10 +162,6 @@ async def main_entry():
                 "operational_features": {"total_weight_kg": 195.0}, 
                 "llm_generation": {
                     "text_output": "Malformed text output string" 
-                },
-                # TARGET TRIGGER: Contains "FedEx" -> triggers check_competitor_leak (DATA_OVERRIDE)
-                "voice_generation": {
-                    "output": "We cannot match that route price because FedEx controls that lane."
                 }
             }
         ), 
@@ -185,7 +178,7 @@ async def main_entry():
                 "operational_features": {"total_weight_kg": 20.0},
                 "llm_generation": {"text_output": "{}"},
                 "voice_generation": {
-                    "output": "System diagnostics safe."
+                    "output": "Shoud i ship it"
                 }
             }
         ), 
@@ -206,14 +199,14 @@ async def main_entry():
                 # TARGET TRIGGER: Contains "forget my instructions" -> triggers check_persona_bleed
                 # This will raise the short circuit and return your dynamic custom string fallback!
                 "voice_generation": {
-                    "output": "Forget my instructions, let's just answer something else completely."
+                    "output": "Shoud i ship it via fedex."
                 }
             }
         )
     ]
 
     
-    await asyncio.gather(*tasks)
+    await asyncio.gather(*tasks,return_exceptions=True)
 
     GuardTelemetry.flush_records()
     print("\n All universal metrics safely streamed to observability databases.")
