@@ -25,7 +25,7 @@ def guard_runtime(node_name:str):
     def decorator(func:Callable):
         @functools.wraps(func)
         async def async_wrapper(*args,**kwargs):
-            init_guardops()
+            
             payload:Dict[str,Any]=None
 
             for arg in args:

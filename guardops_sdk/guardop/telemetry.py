@@ -3,8 +3,6 @@ from typing import Optional, Any, List
 from langfuse import Langfuse
 from langfuse import get_client
 from langfuse import propagate_attributes
-import logging
-from opentelemetry import traces
 
 # Standard instantiation automatically reads LANGFUSE_PUBLIC_KEY, SECRET_KEY, & HOST from the env!
 langfuse_client: Optional[Langfuse] = None

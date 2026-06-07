@@ -2,5 +2,3 @@ mlflow
 langfuse
 pydantic 
 python-dotenv
-opentelemetry-api
-openinference-instrumentation-langchain
