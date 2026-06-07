@@ -24,7 +24,7 @@ GuardOps solves this by embedding validation directly into the runtime layer of 
 The engine captures inbound and outbound dictionary payloads mid-execution. When a soft operational rule triggers a breach, GuardOps intercepts the data stream and safely forces an absolute mutation (`DATA_OVERRIDE`) on the corrupted field, allowing downstream agents to continue processing clean, validated states.
 
 ### 🛑 Deterministic Short-Circuiting
-For fatal compliance or behavioral violations, GuardOps executes a `SHORT_CIRCUIT` strategy. It intercepts execution, halts the agent node pathway instantly by raising a deterministic exception (`GuardOpsRefusalIntercept`), marks the global state as blocked, and safely routes a secure fallback message back to the pipeline gateway.
+For fatal compliance or behavioral violations, GuardOps executes a `SHORT_CIRCUIT` strategy. It intercepts execution, halts the agent node pathway instantly by raising a deterministic exception (`GuardOpsRefusalIntercept`), marks the global complete state.
 
 ### 📊 Dual-Engine Telemetry Tracking
 GuardOps splits operational instrumentation across two specialized enterprise engines to ensure comprehensive observability:
@@ -142,11 +142,13 @@ To fully understand how native checking, nested dot-notation paths, raw values, 
 
 ### Writing Extensible Custom Guards (`custom_guards.py`)
 
+
 When the built-in numeric or regex validation parameters do not suffice, GuardOps allows you to plug in highly tailored Python verification policies. This is achieved by setting your manifest's `condition_type` to `"CUSTOM_CHECK"` and routing the `boundary_limit` directly to your Python file.
 
 ### 📜 The Structural Function Contract
 
 Every custom validation function and dynamic fallback generator must adhere to a strict positional argument signature. If this contract is broken, the core engine will fail to route runtime payload data into your logic correctly.
+
 
 #### 1. Custom Check Function Signature
 
