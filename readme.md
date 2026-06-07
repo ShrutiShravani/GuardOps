@@ -135,7 +135,9 @@ To fully understand how native checking, nested dot-notation paths, raw values, 
 }
 
 ---
-## 🛡️ Writing Extensible Custom Guards (`custom_guards.py`)
+---
+
+### 🛠️ Writing Extensible Custom Guards (`custom_guards.py`)
 
 When the built-in numeric or regex validation parameters do not suffice, GuardOps allows you to plug in highly tailored Python verification policies. This is achieved by setting your manifest's `condition_type` to `"CUSTOM_CHECK"` and routing the `boundary_limit` directly to your python file.
 
@@ -144,15 +146,16 @@ When the built-in numeric or regex validation parameters do not suffice, GuardOp
 Every single custom validation function and dynamic fallback generator must adhere to a strict structural positional argument signature. If this signature contract is broken, the core engine will fail to route data payload context variables to your logic module.
 
 #### 1. Custom Check Function Signature
+
 ```python
 def your_check_name(value: Any, rule_config: dict) -> bool:
+    pass
 
 
 * **`value`**: The data state dynamically isolated from the runtime payload using the manifest's declared `metric_key`.
 * **`rule_config`**: A flat serialization dictionary containing all properties, keys, and routing tags declared for this specific rule object in the configuration file.
 * **Expected Return (`bool`)**: Return `True` to explicitly declare a critical policy breach (this triggers your chosen remediation strategy). Return `False` to signal a safe execution state, letting the payload pass untouched.
 
-Markdown
 ### 💻 Production Blueprint Example (`custom_guards.py`)
 
 Create a script file named `custom_guards.py` exactly inside your root execution directory workspace. Implement your evaluation logic blocks and dynamic message overrides as follows:
@@ -258,19 +261,21 @@ Once your `custom_guards.py` file is written, declare your custom routes inside 
   ]
 }
 
-## 🔌 Framework Integration: How to Apply GuardOps to Your Actual Code
+### 🔌 Framework Integration: How to Apply GuardOps to Your Actual Code
 
 In a real production system, you are likely not passing a manual dictionary from function to function via an explicit `asyncio.gather`. Instead, you are using agentic orchestration frameworks like **LangGraph**, **CrewAI**, or custom business logic pipelines.
 
-The beauty of the GuardOps decorator is that it is **framework-agnostic**. It operates strictly at the function boundary. No matter what orchestrator you use, your agents are ultimately just Python functions or methods that accept an input state and return an updated output state.
+> 💡 **Core Benefit:** The beauty of the GuardOps decorator is that it is **framework-agnostic**. It operates strictly at the function boundary. No matter what orchestrator you use, your agents are ultimately just Python functions or methods that accept an input state and return an updated output state.
+
 
 ---
 
-### LangGraph State Channels Integration
+#### LangGraph State Channels Integration
 
-In LangGraph, state is passed between graph nodes as a central, mutable state schema (usually a subclass of `TypedDict` or a Pydantic model). To secure a LangGraph node, simply place the `@guard_runtime` decorator directly over the node function definition. 
+In LangGraph, state is passed between graph nodes as a central, mutable state schema (usually a subclass of `TypedDict` or a Pydantic model). To secure a LangGraph node, simply place the `@guard_runtime` decorator directly over the node function definition.
 
 The decorator intercepts the incoming graph state channel, runs the evaluation matrix, mutates or short-circuits if needed, and returns the updated state directly back to the graph runner.
+
 
 ```python
 from typing import TypedDict
@@ -301,7 +306,7 @@ workflow.add_node("financial_critic", verify_financial_node)
 # Add conditional edges, set entry points, and compile...
 
 
-# 🚀HOW TO RUN 
+### 🚀HOW TO RUN 
 
 > ⚠️ **Development Note:** GuardOps is currently a localized architectural framework and has **not been packaged as a downloadable distribution library yet**. To execute or evaluate this framework, you must clone the repository directly and run its modular assets locally inside your workspace sandbox.
 
