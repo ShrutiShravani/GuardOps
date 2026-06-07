@@ -15,12 +15,13 @@ from guardops_sdk.guardop.config import (
     FallbackStrategy
 )
 from guardops_sdk.guardop.registry import GuardRegistry
-
+from guardops_sdk.guardop.init import init_guardops
 # 2. Expose the core execution mechanisms and exception classes
 from guardops_sdk.guardop.decorators import (
     guard_runtime,
     GuardOpsRefusalIntercept
 )
+
 
 #mlflow
 
@@ -30,7 +31,12 @@ __all__ = [
     "ConditionType",
     "FallbackStrategy",
     "GuardRegistry",
+    "GuardTelemetry",
+    "GuardExecutionEngine"
     "guard_runtime",
     "GuardOpsRefusalIntercept",
     "initialize_workers"
+    "init_guardops"
 ]
+
+

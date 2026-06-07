@@ -10,7 +10,7 @@ from guardops_sdk.guardop.registry import GuardRegistry
 import mlflow
 from mlflow.tracking import MlflowClient 
 import copy
-
+from guardops_sdk.guardop.init import init_guardops
 
 
 def guard_runtime(node_name:str):
@@ -25,6 +25,7 @@ def guard_runtime(node_name:str):
     def decorator(func:Callable):
         @functools.wraps(func)
         async def async_wrapper(*args,**kwargs):
+            init_guardops()
             payload:Dict[str,Any]=None
 
             for arg in args:
@@ -191,8 +192,8 @@ def guard_runtime(node_name:str):
                                 output={"status": "INTERCEPTED", "reason": intercept.breach_tag}
                             )
                 
-                return payload
-                
+                raise intercept
+             
         return async_wrapper  
     return decorator
                     
