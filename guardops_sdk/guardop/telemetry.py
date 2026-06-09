@@ -3,6 +3,7 @@ from typing import Optional, Any, List
 from langfuse import Langfuse
 from langfuse import get_client
 from langfuse import propagate_attributes
+from opentelemetry import trace
 
 # Standard instantiation automatically reads LANGFUSE_PUBLIC_KEY, SECRET_KEY, & HOST from the env!
 langfuse_client: Optional[Langfuse] = None
@@ -47,26 +48,6 @@ class GuardTelemetry:
     def get_active_trace(cls) -> Optional[Any]:
         """Fetches the isolated trace context belonging strictly to this execution thread."""
         return active_trace_ctx.get()
-
-    @classmethod
-    def log_score(cls,score_name:str,score_value:float,comment:str):
-        """
-        Pushes a real-time system metric valuation score directly to the 
-        Langfuse analytics dashboard for automated security audit logging.
-        """
-        current_span= trace.get_current_span()
-
-        if current_span.is_recording():
-            current_span.set_attribute("guardops.interception_triggered", True)
-        current_span.add_event(
-            name="langfuse.score",
-            attributes={
-                "langfuse.score.name":str(score_name),
-                "langfuse.score.value":float(score_value),
-                "langfuse.score.comment":str(comment)
-
-            }
-        )
     
     @classmethod
     def flush_records(cls) -> None:

@@ -8,5 +8,4 @@ mlflow_retrain_data
 mlruns
 trail.py
 import_trace.txt
-*.json
 readme.md

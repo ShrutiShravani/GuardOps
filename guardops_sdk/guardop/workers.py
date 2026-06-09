@@ -212,5 +212,7 @@ async def main_entry():
     print("\n All universal metrics safely streamed to observability databases.")
 
 if __name__ == "__main__":
+    print(os.getcwd())
+    print(os.path.abspath("guard_manifest.json"))
     
     asyncio.run(main_entry())

@@ -2,3 +2,4 @@ mlflow
 langfuse
 pydantic 
 python-dotenv
+opentelemetry-api

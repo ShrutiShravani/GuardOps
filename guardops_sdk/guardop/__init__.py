@@ -35,7 +35,7 @@ __all__ = [
     "GuardExecutionEngine"
     "guard_runtime",
     "GuardOpsRefusalIntercept",
-    "initialize_workers"
+    "initialize_workers",
     "init_guardops"
 ]
 

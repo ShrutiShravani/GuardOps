@@ -10,7 +10,7 @@ from guardops_sdk.guardop.registry import GuardRegistry
 import mlflow
 from mlflow.tracking import MlflowClient 
 import copy
-from guardops_sdk.guardop.init import init_guardops
+from guardops_sdk.guardop.init import init_guardops,_INITIALIZED
 
 
 def guard_runtime(node_name:str):
@@ -25,7 +25,9 @@ def guard_runtime(node_name:str):
     def decorator(func:Callable):
         @functools.wraps(func)
         async def async_wrapper(*args,**kwargs):
-            
+            if not _INITIALIZED:
+                init_guardops()
+
             payload:Dict[str,Any]=None
 
             for arg in args:

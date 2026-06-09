@@ -1,0 +1,59 @@
+{
+  "CriticAgent": [
+    {
+      "metric_key": "predicted_base_price",
+      "condition_type": "UNDER_FLOOR",
+      "boundary_limit": 5.00,
+      "fallback_value": 5.00,
+      "strategy": "DATA_OVERRIDE",
+      "breach_tag": "INDIVIDUAL_PRICE_UNDER_FLOOR"
+    },
+    {
+      "metric_key": "operational_cost",
+      "condition_type": "OVER_CEILING",
+      "boundary_limit": 500.00,
+      "fallback_value": "Cost ceiling exceeded,Request blocked",
+      "strategy": "SHORT_CIRCUIT",
+      "breach_tag": "OPERATIONAL_COST_EXCEEDS_MAX_BUDGET"
+    },
+    {
+      "metric_key": "operational_features.total_weight_kg",
+      "condition_type": "OVER_CEILING",
+      "boundary_limit": 150.0,
+      "fallback_value": 150.0,
+      "strategy": "DATA_OVERRIDE",
+      "breach_tag": "NESTED_CLUSTER_WEIGHT_LIMIT_EXCEEDED"
+    }
+  ],
+  "LLM_Output_Generation_Node": [
+    {
+      "metric_key": "llm_generation.text_output",
+      "condition_type": "REGEX_MISMATCH",
+      "boundary_limit": "^\\{.*\"waybill_id\":\\s*\"WB-[0-9]{4}-[A-Z]{3}\".*\\}$",
+      "fallback_value": "{\"status\": \"FALLBACK_STRUCTURAL_RECOVERY\", \"waybill_id\": \"WB-0000-FAILED\"}",
+      "strategy": "DATA_OVERRIDE",
+      "breach_tag": "PROVIDER_SILENT_SCHEMA_SHIFT_DETECTED"
+    }
+  ],
+  
+  "Voice_Generation_Node": [
+    {
+      "metric_key": "voice_generation.output",
+      "strategy": "DATA_OVERRIDE",
+      "checks": [
+        {
+          "condition_type": "CUSTOM_CHECK",
+          "boundary_limit": "custom_guards.check_persona_bleed",
+          "fallback_value": "custom_guards.dynamic_voice_persona_fallback",
+          "breach_tag": "INTERVIEWER_PERSONA_BLEED_DETECTED"
+        },
+        {
+          "condition_type": "CUSTOM_CHECK",
+          "boundary_limit": "custom_guards.check_competitor_leak",
+          "fallback_value": "As an internal assistant, I am optimized to discuss our shipping networks.",
+          "breach_tag": "COMPETITOR_LEAK_SABOTAGE"
+        }
+      ]
+    }
+  ]
+}

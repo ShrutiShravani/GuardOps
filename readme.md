@@ -4,6 +4,62 @@ GuardOps is a high-performance, production-grade security and compliance proxy l
 
 By natively pairing **OpenTelemetry (via Langfuse v4)** with **Experiment & Retraining Artifact Tracking (via MLflow)**, GuardOps transforms black-box agent behaviors into a completely deterministic, auditable, and observable engineering pipeline.
 
+## NOTE: Supported State Formats
+
+GuardOps currently operates on dictionary-based state objects.
+
+### Supported
+
+- ✅ `dict`
+- ✅ `TypedDict` (recommended for LangGraph workflows)
+
+Example:
+
+```python
+from typing import TypedDict
+
+class AgentState(TypedDict):
+    query: str
+    result: str
+
+@guard_runtime(node_name="planner")
+def planner_node(state: AgentState):
+    return state
+```
+
+### Currently Unsupported
+
+- ❌ Pydantic models (`BaseModel`)
+- ❌ Dataclasses (`@dataclass`)
+- ❌ Custom Python classes
+
+Examples:
+
+```python
+from pydantic import BaseModel
+
+class AgentState(BaseModel):
+    query: str
+```
+
+```python
+from dataclasses import dataclass
+
+@dataclass
+class AgentState:
+    query: str
+```
+
+```python
+class AgentState:
+    def __init__(self):
+        self.query = ""
+```
+
+### Why?
+
+GuardOps is currently optimized for LangGraph-style workflows, where state is typically represented as a `dict` or `TypedDict`. Support for additional state representations may be added in future releases
+
 ---
 
 ## 🛠️ Why GuardOps? (Core Value Proposition)
@@ -37,6 +93,48 @@ GuardOps splits operational instrumentation across two specialized enterprise en
 ---
 
 👉 **Want to try GuardOps immediately? Jump to the [How to Run](#-how-to-run) section.**
+
+
+WORKFLOW:
+
+ ┌────────────────────────────┐
+                │   USER PROJECT FOLDER      │
+                │  guard_manifest.json       │
+                │  custom_guards.py          │
+                └────────────┬───────────────┘
+                             │
+                             ▼
+        ┌────────────────────────────────────┐
+        │        GUARDOPS LOADER             │
+        │  - manifest discovery              │
+        │  - function resolution             │
+        │  - validation                     │
+        └────────────┬───────────────────────┘
+                             │
+                             ▼
+        ┌────────────────────────────────────┐
+        │        POLICY ENGINE (VM)          │
+        │  - evaluates rules                 │
+        │  - executes custom checks          │
+        │  - applies overrides              │
+        │  - emits interventions             │
+        └────────────┬───────────────────────┘
+                             │
+                             ▼
+        ┌────────────────────────────────────┐
+        │      DECORATOR / RUNTIME WRAPPER   │
+        │  - wraps node execution           │
+        │  - captures payload diff          │
+        │  - triggers engine                │
+        └────────────┬───────────────────────┘
+                             │
+                             ▼
+        ┌────────────────────────────────────┐
+        │   OBSERVABILITY LAYER              │
+        │  - Langfuse spans                 │
+        │  - MLflow artifacts               │
+        │  - Scores (optional)              │
+        └────────────────────────────────────┘
 
 ---
 

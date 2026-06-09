@@ -11,7 +11,7 @@ def load_manifest():
 
     manifest_path= os.path.join(root,"guard_manifest.json")
 
-    if os.path.exists(manifest_path):
+    if not os.path.exists(manifest_path):
         raise FileNotFoundError(f"guard_manifest.json does not exists")
     
     GuardRegistry.load_manifest(manifest_path)
@@ -22,7 +22,7 @@ def load_manifest():
 def load_custom_guards():
     root = find_project_root()
 
-    guard_file = os.path.join(root,"cutsom_guards.py")
+    guard_file = os.path.join(root,"custom_guards.py")
 
     if not os.path.exists(guard_file):
         return None
