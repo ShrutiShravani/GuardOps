@@ -96,7 +96,7 @@ def guard_runtime(node_name:str,**decorator_kwargs):
                     execution_id =str(uuid.uuid4())
             
                     GuardTelemetry.start_trace_session(trace_name=f"UniversalPipeline_{execution_id}",user_id=user_id,tags=["Production-Runtime-Shield", "Architecture-v1"])
-                    print("telemtry session done")
+           
                     run = mlflow_client.create_run(
                         experiment_id= experiment_id,
                         tags={
@@ -168,7 +168,6 @@ def guard_runtime(node_name:str,**decorator_kwargs):
                             )
 
                       
-                    
                 return safeguarded_payload
             
             except GuardOpsRefusalIntercept as intercept:
@@ -207,7 +206,7 @@ def guard_runtime(node_name:str,**decorator_kwargs):
                     os.makedirs("mlflow_retrain_data", exist_ok=True)
                     with open(artifact_path, "w") as f:
                         json.dump({"breached_input": clean_input_snapshot, "applied_output": clean_sc_payload}, f, indent=2)
-                        print("dumped ")
+                     
                     
                     # Log the file as an artifact inside MLflow so data scientists can access it for training
                     mlflow_client.log_artifact(run_id,artifact_path, artifact_path="breached_retraining_payloads")

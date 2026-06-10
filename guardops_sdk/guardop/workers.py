@@ -7,12 +7,6 @@ import mlflow
 from mlflow.tracking import MlflowClient
 import os
 
-DB_URI= os.getenv("DB_URI")
-MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI")
-client = MlflowClient()
-#print("MLFLOW_TRACKING_URI =", MLFLOW_TRACKING_URI)
-
-mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
 
 
 @guard_runtime(node_name="CriticAgent")
@@ -40,31 +34,10 @@ async def worker_conductor(payload_id:str,tenant_id:str,simulated_data:dict):
     Universal Worker Conductor: Runs on an isolated, thread-safe memory context.
     Spawns the Langfuse parent trace session and drives the payload stream.
     """
-
-    experiment_name = "GuardOps_Universal_Shield_Analytics"
-    exp=mlflow.get_experiment_by_name(experiment_name)
-    if not exp:
-        exp_id= mlflow.create_experiment(experiment_name)
-    else:
-        exp_id= exp.experiment_id
-
-    run= client.create_run(
-        experiment_id= exp_id,
-        tags= {"mlflow.runName": f"ExecutionGraph_{payload_id}"}
-    )
-    
-    run_id = run.info.run_id
-
-    GuardTelemetry.start_trace_session(trace_name=f"UniversalPipeline_{payload_id}",
-        user_id=tenant_id,
-        tags=["Production-Runtime-Shield", "Architecture-v1"])
     
     # 2. Build a completely abstract, universal payload structure
    
     payload = {
-        "payload_id": payload_id,
-        "tenant_id": tenant_id,
-        "mlflow_run_id": run_id,  #
         "status": "PROCESSING",
         "agent_trace": [],
         **simulated_data  # <─── Unpacks any dynamic dictionary keys right into the payload!
@@ -73,39 +46,31 @@ async def worker_conductor(payload_id:str,tenant_id:str,simulated_data:dict):
     print(f"Worker starting job for {payload_id}")
     try:
     
-        client.log_param(run_id,"tenant_owner", tenant_id)
-
         #fire paylad to guard runtime
         payload = await execute_critic_agent(payload)
         if payload.get("status")=="BLOCKED_BY_GUARDOP_POLICY":
             print(f"[BYPASS TRIGGERED] Short-Circuit at CriticAgent. Halting execution pipeline.")
-            client.set_terminated(run_id, status="KILLED")
             payload= sanitize_payload(payload)
             return payload
 
         payload= await execute_llm_generation(payload)
         if payload.get("status")=="BLOCKED_BY_GUARDOP_POLICY":
             print(f"[BYPASS TRIGGERED] Short-Circuit at LLM Generation Node. Halting execution pipeline.")
-            client.set_terminated(run_id, status="KILLED")
-            payload= sanitize_payload(payload)
+         
             return payload
         
         payload= await execute_voice_generation(payload)
         if payload.get("status")=="BLOCKED_BY_GUARDOP_POLICY":
             print(f"[BYPASS TRIGGERED] Short-Circuit at Voice Generation Node. Halting execution pipeline.")
-            client.set_terminated(run_id, status="KILLED")
-            payload= sanitize_payload(payload)
+
             return payload
 
         payload["status"]="COMPLETED_SUCCESSFULLY"
         print(f"Worker complete for {payload_id} -> Safety Status: {payload.get('status')}")
     
-
-        client.set_terminated(run_id,status="FINISHED")
         print(f"Pipeline Execution Graph {payload_id} complete.")
         return sanitize_payload(payload)
     except Exception as e:
-        client.set_terminated(run_id,status="FAILED")
         print(f"Pipeline Execution Graph {payload_id} failed: {e}")
         if payload and isinstance(payload,dict):
             payload= sanitize_payload(payload)
