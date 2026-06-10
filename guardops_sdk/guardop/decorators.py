@@ -6,14 +6,14 @@ import os
 from typing import Dict, Any, Callable
 from guardops_sdk.guardop.engine import GuardExecutionEngine, GuardOpsRefusalIntercept
 from guardops_sdk.guardop.telemetry import GuardTelemetry
-from guardops_sdk.guardop.registry import GuardRegistry 
 import mlflow
 from mlflow.tracking import MlflowClient 
 import copy
-from guardops_sdk.guardop.init import init_guardops,_INITIALIZED
+from guardops_sdk.guardop.init import init_guardops,get_experiment_id,is_initialized
+import uuid
 
-
-def guard_runtime(node_name:str):
+mlflow_client= MlflowClient()
+def guard_runtime(node_name:str,**decorator_kwargs):
     """
     Unified Langfuse v4 + MLflow Multi-Agent Orchestrator Decorator.
     - Isolates execution streams via ContextVars.
@@ -25,8 +25,11 @@ def guard_runtime(node_name:str):
     def decorator(func:Callable):
         @functools.wraps(func)
         async def async_wrapper(*args,**kwargs):
-            if not _INITIALIZED:
+            if not is_initialized():
                 init_guardops()
+            
+            # 2. FIX: Call your getter utility function to safely grab the active ID
+            experiment_id = get_experiment_id()
 
             payload:Dict[str,Any]=None
 
@@ -42,23 +45,28 @@ def guard_runtime(node_name:str):
             
             if payload is None:
                 return await func(*args,**kwargs)
-
+            
+         
+          
+            
             parent_trace_id= GuardTelemetry.get_active_trace()
             client= GuardTelemetry.get_global_client()
 
 
-            raw_input_snapshot = copy.deepcopy(payload)
-            original_payload = {k: v for k, v in raw_input_snapshot.items() if k not in ["tenant_id", "mlflow_run_id"]}
-            waybill_id=payload.get("payload_id","UNKNOWN")
-            
 
-            run_id= payload.get("mlflow_run_id")
-            mlflow_client= MlflowClient() if run_id else None
+
+            raw_input_snapshot = copy.deepcopy(payload)
+         
+            waybill_id=payload.get("payload_id","UNKNOWN")
+          
             clean_input_snapshot = {
                 k: v for k, v in raw_input_snapshot.items() 
                 if k not in ["tenant_id", "mlflow_run_id", "agent_trace"]
             }
             
+            
+                 # ─── MLFLOW TRACKING FOR CASE A: DATA_OVERRIDE ───
+            user_id = decorator_kwargs.get("user_id") or payload.get("user_id") or "anonymous_enterprise_client"
             
     
             try:
@@ -81,13 +89,24 @@ def guard_runtime(node_name:str):
 
                 safeguarded_payload = engine_result["payload"]
                 interventions = engine_result["interventions"]
+        
     
 
-                 # ─── MLFLOW TRACKING FOR CASE A: DATA_OVERRIDE ───
-                triggered_overrides={}
-
-
                 for intervention in interventions:
+                    execution_id =str(uuid.uuid4())
+            
+                    GuardTelemetry.start_trace_session(trace_name=f"UniversalPipeline_{execution_id}",user_id=user_id,tags=["Production-Runtime-Shield", "Architecture-v1"])
+                    print("telemtry session done")
+                    run = mlflow_client.create_run(
+                        experiment_id= experiment_id,
+                        tags={
+                            "node_name": node_name,
+                            "event_type": "DATA_OVERRIDE"
+                        }
+                    )
+          
+                    run_id = run.info.run_id
+               
 
                     breach_tag = intervention["breach_tag"]
                     if mlflow_client and run_id:
@@ -96,12 +115,14 @@ def guard_runtime(node_name:str):
                         f"override_triggered_{node_name}",
                         1.0
                     )
+                 
 
                      mlflow_client.log_param(
                             run_id,
                             f"{node_name}_{breach_tag}",
                             "DATA_OVERRIDE_TRIGGERED"
                         )
+                   
 
                     clean_log = {
                     "node_name": node_name,
@@ -113,17 +134,19 @@ def guard_runtime(node_name:str):
                         if k not in ["tenant_id", "mlflow_run_id"]
                     }
                 }
-                                
-        
-                            
+                
                     # Export the exact breached payload to a local folder to log as an MLflow retraining artifact
-                    artifact_path = f"mlflow_retrain_data/{node_name}_{breach_tag}_{waybill_id}.json"
+                    artifact_path = f"mlflow_retrain_data/{node_name}_{waybill_id}.json"
                     os.makedirs("mlflow_retrain_data", exist_ok=True)
+               
                     with open(artifact_path, "w") as f:
                         json.dump({"breached_input": clean_input_snapshot, "applied_output": clean_log}, f, indent=2)
                     
+                 
                     # Log the file as an artifact inside MLflow so data scientists can access it for training
                     mlflow_client.log_artifact(run_id,artifact_path, artifact_path="breached_retraining_payloads")
+                    print(f"[BYPASS TRIGGERED] Short-Circuit at {node_name}. Halting execution pipeline.")
+                    mlflow_client.set_terminated(run_id,status="FINISHED")
                  
 
                
@@ -149,8 +172,22 @@ def guard_runtime(node_name:str):
                 return safeguarded_payload
             
             except GuardOpsRefusalIntercept as intercept:
+                execution_id =str(uuid.uuid4)
+            
+                GuardTelemetry.start_trace_session(trace_name=f"UniversalPipeline_{execution_id}",user_id=user_id,tags=["Production-Runtime-Shield", "Architecture-v1"])
+
+                run = mlflow_client.create_run(
+                experiment_id=experiment_id,
+                tags={
+                    "node_name": node_name,
+                    "event_type": "SHORT_CIRCUIT"
+                }
+            )
+
+                run_id = run.info.run_id
                 if mlflow_client and run_id:
                     mlflow_client.log_metric(run_id, f"critical_policy_violation_{node_name}", 1.0)
+                    mlflow_client.set_terminated(run_id, status="KILLED")
                     
                     
                     target_error_state= raw_agent_output if 'raw_agent_output' in locals() else raw_input_snapshot
@@ -170,6 +207,7 @@ def guard_runtime(node_name:str):
                     os.makedirs("mlflow_retrain_data", exist_ok=True)
                     with open(artifact_path, "w") as f:
                         json.dump({"breached_input": clean_input_snapshot, "applied_output": clean_sc_payload}, f, indent=2)
+                        print("dumped ")
                     
                     # Log the file as an artifact inside MLflow so data scientists can access it for training
                     mlflow_client.log_artifact(run_id,artifact_path, artifact_path="breached_retraining_payloads")
@@ -198,7 +236,3 @@ def guard_runtime(node_name:str):
              
         return async_wrapper  
     return decorator
-                    
-        
-
-

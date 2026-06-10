@@ -599,7 +599,10 @@ When a decorated agent executes, GuardOps wraps the complete lifecycle:
 
 The current architecture establishes a low-latency runtime safety layer integrated with Langfuse and MLflow. Future iterations are designed to support enterprise-scale deployments.
 
-### 1. Decoupled Custom Guard Directories
+### 1.Stateless Context Injection (The Resume Scalability Story)
+* Completely removing the static configuration file and moving the policy boundaries directly into a payload["guard_policies"] contract block. To scale the system for true enterprise multi-tenancy,i will move GuardOps from a static configuration model to a stateless context-injection pattern. Instead of hardcoding blanket limits, an API gateway fetches tenant-specific thresholds from a high-speed cache and dynamically appends them to the transactional payload. This keeps the execution decorators entirely stateless and isolates rule enforcement perfectly per customer."
+
+### 2. Decoupled Custom Guard Directories
 
 * Move beyond a single `custom_guards.py` file.
 * Support modular guard packages:
@@ -616,7 +619,7 @@ guards/
 
 ---
 
-### 2. Full Multi-Agent DAG Interception
+### 3. Full Multi-Agent DAG Interception
 
 * Native support for complex DAG-based agent workflows.
 * Validate state transitions across multiple agent boundaries.
@@ -636,7 +639,7 @@ Each node can independently enforce GuardOps policies.
 
 ---
 
-### 3. Manifest Parameterization & Centralized Control
+### 4. Manifest Parameterization & Centralized Control
 
 * Move thresholds and evaluation parameters into manifests.
 * Support JSON and YAML policy definitions.

@@ -27,7 +27,7 @@
   ],
   "LLM_Output_Generation_Node": [
     {
-      "metric_key": "llm_generation.text_output",
+      "metric_key": "text_output",
       "condition_type": "REGEX_MISMATCH",
       "boundary_limit": "^\\{.*\"waybill_id\":\\s*\"WB-[0-9]{4}-[A-Z]{3}\".*\\}$",
       "fallback_value": "{\"status\": \"FALLBACK_STRUCTURAL_RECOVERY\", \"waybill_id\": \"WB-0000-FAILED\"}",
@@ -38,7 +38,7 @@
   
   "Voice_Generation_Node": [
     {
-      "metric_key": "voice_generation.output",
+      "metric_key": "output",
       "strategy": "DATA_OVERRIDE",
       "checks": [
         {

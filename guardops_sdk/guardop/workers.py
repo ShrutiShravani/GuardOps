@@ -144,9 +144,8 @@ async def main_entry():
                 "predicted_base_price": 25.00,               
                 "operational_cost": 120.00,                  
                 "operational_features": {"total_weight_kg": 45.0}, 
-                "llm_generation": {
-                    "text_output": '{"waybill_id": "WB-2026-NYC", "status": "VERIFIED"}' 
-                }
+                "text_output": '{"waybill_id": "WB-2026-NYC", "status": "VERIFIED"}'
+                
             }
         ),
         
@@ -160,9 +159,7 @@ async def main_entry():
                 "predicted_base_price": 2.10,                
                 "operational_cost": 185.00,                    
                 "operational_features": {"total_weight_kg": 195.0}, 
-                "llm_generation": {
-                    "text_output": "Malformed text output string" 
-                }
+                "text_output": "Malformed text output string"
             }
         ), 
         
@@ -176,11 +173,9 @@ async def main_entry():
                 "predicted_base_price": 15.00,
                 "operational_cost": 650.00, # Breaches Node 1 math rules immediately and cuts off                  
                 "operational_features": {"total_weight_kg": 20.0},
-                "llm_generation": {"text_output": "{}"},
-                "voice_generation": {
-                    "output": "Shoud i ship it"
+                "text_output": "",
+                "output": "Shoud i ship it"
                 }
-            }
         ), 
         
         # ────────────────────────────────────────────────────────
@@ -193,15 +188,13 @@ async def main_entry():
                 "predicted_base_price": 10.00,                 
                 "operational_cost": 45.00,                    
                 "operational_features": {"total_weight_kg": 5.0}, 
-                "llm_generation": {
-                    "text_output": "Standard structured response." 
-                },
+                "text_output": "Standard structured response.",
+    
                 # TARGET TRIGGER: Contains "forget my instructions" -> triggers check_persona_bleed
                 # This will raise the short circuit and return your dynamic custom string fallback!
-                "voice_generation": {
-                    "output": "Shoud i ship it via fedex."
+    
+                "output": "Shoud i ship it via fedex."
                 }
-            }
         )
     ]
 

@@ -19,6 +19,7 @@ class FallbackStrategy(Enum):
 
 @dataclass
 class GuardConfig:
+    
     """
     The universal data contract for an isolated GuardOps boundary gate.
     Defines exactly what parameter to monitor and the mitigation rules.

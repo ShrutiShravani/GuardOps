@@ -104,13 +104,14 @@ class GuardExecutionEngine:
                     # Uses our write pathtool to update the dictionary in memory
                     GuardRegistry.override_value_by_path(payload, rule.metric_key,resolved_fallback_message)
                     interventions.append({
-                    "node_name": node_name,
-                    "breach_tag": rule.breach_tag,
-                    "metric_key": rule.metric_key,
+                    "node_name": str(node_name),
+                    "breach_tag": str(rule.breach_tag),
+                    "metric_key": str(rule.metric_key),
                     "original_value": old_value,
                     "safe_fallback_value": resolved_fallback_message
                 })
                     cls._append_trace(payload, f"[Local Fix] Field '{rule.metric_key}' overrode to safe default.")
+                    print("appeneded")
                 
                 # ─── CASE B: PIPELINE INTERCEPT (Stop-and-Refuse) ───
                 if rule.strategy == FallbackStrategy.SHORT_CIRCUIT:
