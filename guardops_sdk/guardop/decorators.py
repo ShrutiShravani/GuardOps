@@ -45,13 +45,7 @@ def guard_runtime(node_name:str,**decorator_kwargs):
             
             if payload is None:
                 return await func(*args,**kwargs)
-            
-         
-          
-            
-            parent_trace_id= GuardTelemetry.get_active_trace()
-            client= GuardTelemetry.get_global_client()
-
+ 
 
 
 
@@ -94,6 +88,11 @@ def guard_runtime(node_name:str,**decorator_kwargs):
 
                 for intervention in interventions:
                     execution_id =str(uuid.uuid4())
+                               
+            
+                    parent_trace_id= GuardTelemetry.get_active_trace()
+                    client= GuardTelemetry.get_global_client()
+
             
                     GuardTelemetry.start_trace_session(trace_name=f"UniversalPipeline_{execution_id}",user_id=user_id,tags=["Production-Runtime-Shield", "Architecture-v1"])
            
@@ -171,7 +170,7 @@ def guard_runtime(node_name:str,**decorator_kwargs):
                 return safeguarded_payload
             
             except GuardOpsRefusalIntercept as intercept:
-                execution_id =str(uuid.uuid4)
+                execution_id =str(uuid.uuid4())
             
                 GuardTelemetry.start_trace_session(trace_name=f"UniversalPipeline_{execution_id}",user_id=user_id,tags=["Production-Runtime-Shield", "Architecture-v1"])
 

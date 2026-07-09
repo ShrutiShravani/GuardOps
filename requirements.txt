@@ -2,3 +2,5 @@ mlflow
 langfuse
 python-dotenv
 opentelemetry-api
+openai
+sentence-transformers

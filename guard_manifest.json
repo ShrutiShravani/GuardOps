@@ -13,7 +13,7 @@
       "condition_type": "OVER_CEILING",
       "boundary_limit": 500.00,
       "fallback_value": "Cost ceiling exceeded,Request blocked",
-      "strategy": "SHORT_CIRCUIT",
+      "strategy": "DATA_OVERRIDE",
       "breach_tag": "OPERATIONAL_COST_EXCEEDS_MAX_BUDGET"
     },
     {
@@ -31,29 +31,65 @@
       "condition_type": "REGEX_MISMATCH",
       "boundary_limit": "^\\{.*\"waybill_id\":\\s*\"WB-[0-9]{4}-[A-Z]{3}\".*\\}$",
       "fallback_value": "{\"status\": \"FALLBACK_STRUCTURAL_RECOVERY\", \"waybill_id\": \"WB-0000-FAILED\"}",
-      "strategy": "DATA_OVERRIDE",
+      "strategy": "SHORT_CIRCUIT",
       "breach_tag": "PROVIDER_SILENT_SCHEMA_SHIFT_DETECTED"
     }
   ],
   
   "Voice_Generation_Node": [
     {
-      "metric_key": "output",
+      "metric_key": "voice_output",
       "strategy": "DATA_OVERRIDE",
       "checks": [
         {
           "condition_type": "CUSTOM_CHECK",
-          "boundary_limit": "custom_guards.check_persona_bleed",
-          "fallback_value": "custom_guards.dynamic_voice_persona_fallback",
-          "breach_tag": "INTERVIEWER_PERSONA_BLEED_DETECTED"
+          "boundary_limit": "custom_guards.check_question_repeat",
+          "fallback_value": "custom_guards.recover_next_question",
+          "breach_tag": "VOICE_QUESTION_REPEATED",
+          "parameters": {
+            "session_id": "interview_session_001",
+            "question_bank": [
+              "Tell me about yourself",
+              "Walk me through a system design you are proud of",
+              "Describe a conflict with a teammate",
+              "What is your approach to debugging production issues",
+              "Where do you see yourself in 5 years"
+            ]
+          }
         },
         {
           "condition_type": "CUSTOM_CHECK",
-          "boundary_limit": "custom_guards.check_competitor_leak",
-          "fallback_value": "As an internal assistant, I am optimized to discuss our shipping networks.",
-          "breach_tag": "COMPETITOR_LEAK_SABOTAGE"
+          "boundary_limit": "custom_guards.check_context_loss",
+          "fallback_value": "custom_guards.recover_context_anchor",
+          "breach_tag": "VOICE_CONTEXT_LOST",
+          "parameters": {
+            "session_id": "interview_session_001"
+          }
         }
       ]
     }
-  ]
+  ],
+  "Chat_Generation_Node": [
+  {
+    "metric_key": "chat_output",
+    "strategy": "DATA_OVERRIDE",
+    "checks": [
+      {
+        "condition_type": "CUSTOM_CHECK",
+        "boundary_limit": "custom_guards.check_question_repeat",
+        "fallback_value": "custom_guards.recover_next_question",
+        "breach_tag": "CHAT_QUESTION_REPEATED",
+        "parameters": {
+          "session_id": "chat_session_001",
+          "question_bank": [
+            "Tell me about yourself",
+            "Walk me through a system design you are proud of",
+            "Describe a conflict with a teammate"
+          ]
+        }
+      }
+
+    ]
+  }
+]
 }

@@ -77,7 +77,7 @@ class GuardExecutionEngine:
             "fallback_value": rule.fallback_value,
             "strategy": rule.strategy.value,             
             "breach_tag": rule.breach_tag,
-            "metadata": getattr(rule, "metadata", {})
+            "parameters": getattr(rule, "parameters", {})
             }
 
             # if specific key is not rpesent in this transaction step,skip safely

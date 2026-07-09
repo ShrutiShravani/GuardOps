@@ -28,8 +28,7 @@ class GuardConfig:
     condition_type:ConditionType
     boundary_limit: Any
     fallback_value:Any
-    strategy:FallbackStrategy=FallbackStrategy.SHORT_CIRCUIT
+    strategy:FallbackStrategy
     breach_tag: str="GUARDOPS_BREACH_WARNING"
-    metadata:dict=field(default_factory=dict)
     parameters: Dict[str, Any] = field(default_factory=dict)
 

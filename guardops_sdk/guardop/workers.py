@@ -6,6 +6,7 @@ from guardops_sdk.guardop.decorators import guard_runtime
 import mlflow
 from mlflow.tracking import MlflowClient
 import os
+from custom_guards import update_session_turn, store_candidate_fact,_get_session
 
 
 
@@ -29,6 +30,12 @@ async def execute_voice_generation(payload:dict)->dict:
     await asyncio.sleep(0.05)
     return payload
 
+@guard_runtime(node_name="Chat_Generation_Node")
+async def execute_chat_generation(payload: dict) -> dict:
+    print("[NODE EXECUTION] Chat_Generation_Node validating session context...")
+    await asyncio.sleep(0.05)
+    return payload
+
 async def worker_conductor(payload_id:str,tenant_id:str,simulated_data:dict):
     """
     Universal Worker Conductor: Runs on an isolated, thread-safe memory context.
@@ -36,6 +43,12 @@ async def worker_conductor(payload_id:str,tenant_id:str,simulated_data:dict):
     """
     
     # 2. Build a completely abstract, universal payload structure
+
+    GuardTelemetry.start_trace_session(
+        trace_name=f"WorkerPipeline_{payload_id}",
+        user_id=tenant_id,
+        tags=["Production-Runtime-Shield", "Architecture-v1"]
+    )
    
     payload = {
         "status": "PROCESSING",
@@ -49,8 +62,7 @@ async def worker_conductor(payload_id:str,tenant_id:str,simulated_data:dict):
         #fire paylad to guard runtime
         payload = await execute_critic_agent(payload)
         if payload.get("status")=="BLOCKED_BY_GUARDOP_POLICY":
-            print(f"[BYPASS TRIGGERED] Short-Circuit at CriticAgent. Halting execution pipeline.")
-            payload= sanitize_payload(payload)
+            print(f"[BYPASS TRIGGERED] Data override at CriticAgent. Halting execution pipeline.")   
             return payload
 
         payload= await execute_llm_generation(payload)
@@ -61,8 +73,13 @@ async def worker_conductor(payload_id:str,tenant_id:str,simulated_data:dict):
         
         payload= await execute_voice_generation(payload)
         if payload.get("status")=="BLOCKED_BY_GUARDOP_POLICY":
-            print(f"[BYPASS TRIGGERED] Short-Circuit at Voice Generation Node. Halting execution pipeline.")
+            print(f"[BYPASS TRIGGERED] Data override at Voice Generation Node. Halting execution pipeline.")
 
+            return payload
+
+        payload = await execute_chat_generation(payload)
+        if payload.get("status") == "BLOCKED_BY_GUARDOP_POLICY":
+            print(f"[BYPASS TRIGGERED] Data override at Chat Generation Node.")
             return payload
 
         payload["status"]="COMPLETED_SUCCESSFULLY"
@@ -97,7 +114,34 @@ async def main_entry():
     Simulates 4 distinct multi-tenant requests hitting the universal framework 
     concurrently at the exact same millisecond.
     """
+     # Simulates turns that already happened in the interview
+    
+    
+    # DEMO ONLY — simulates 2 prior interview turns already completed
+    # In production this builds automatically turn by turn
 
+        # Voice session
+    session = _get_session("interview_session_001")
+    session["questions_asked"].append("Tell me about yourself")
+    session["questions_asked"].append("Walk me through a system design")
+    session["last_turns"] = [
+        "User: I have 3 years Python experience in fintech",
+        "Agent: Tell me about yourself",
+        "User: I built a distributed caching layer",
+        "Agent: Walk me through a system design"
+    ]
+    session["turn_count"] = 2 # ← belongs here not below
+
+    # Chat session
+    session_chat = _get_session("chat_session_001")  # ← must come first
+    session_chat["questions_asked"].append("Tell me about yourself")
+    session_chat["candidate_facts"]["python experience"] = "3 years in fintech"
+    session_chat["last_turns"] = [
+        "User: I have 3 years Python experience",
+        "Agent: Tell me about yourself"
+    ]
+    session_chat["turn_count"] = 2
+        
     tasks = [
         # ────────────────────────────────────────────────────────
         # JOB 1: CLEAN RUN (Passes all validations flawlessly)
@@ -106,10 +150,10 @@ async def main_entry():
             payload_id="JOB-001-CLEAN", 
             tenant_id="Logistics_Corp_A", 
             simulated_data={
-                "predicted_base_price": 25.00,               
+                "predicted_base_price": 4.00,               
                 "operational_cost": 120.00,                  
                 "operational_features": {"total_weight_kg": 45.0}, 
-                "text_output": '{"waybill_id": "WB-2026-NYC", "status": "VERIFIED"}'
+                "output": '{"waybill_id": "WB-2026-NYC", "status": "VERIFIED"}'
                 
             }
         ),
@@ -121,47 +165,52 @@ async def main_entry():
             payload_id="JOB-002-OVERRIDE-RUN", 
             tenant_id="Tenant_Enterprise_C", 
             simulated_data={
-                "predicted_base_price": 2.10,                
-                "operational_cost": 185.00,                    
-                "operational_features": {"total_weight_kg": 195.0}, 
                 "text_output": "Malformed text output string"
             }
         ), 
         
-        # ────────────────────────────────────────────────────────
-        # JOB 3: BUDGET SHORT-CIRCUIT (Stops at Node 1 instantly)
-        # ────────────────────────────────────────────────────────
-        worker_conductor(
-            payload_id="JOB-003-BUDGET-SHORT", 
-            tenant_id="Logistics_Corp_C", 
-            simulated_data={
-                "predicted_base_price": 15.00,
-                "operational_cost": 650.00, # Breaches Node 1 math rules immediately and cuts off                  
-                "operational_features": {"total_weight_kg": 20.0},
-                "text_output": "",
-                "output": "Shoud i ship it"
-                }
-        ), 
+    
         
-        # ────────────────────────────────────────────────────────
-        # JOB 4: PERSONA BLEED INTERCEPT (Short-circuits at Node 3 via function verification)
-        # ────────────────────────────────────────────────────────
+        
+        # JOB 3: VOICE — question repeat breach
         worker_conductor(
-            payload_id="INTERVIEW-SHRUTI-01", 
-            tenant_id="Candidate_Shruti", 
+            payload_id="INTERVIEW-VOICE-REPEAT",
+            tenant_id="Candidate_Demo",
             simulated_data={
-                "predicted_base_price": 10.00,                 
-                "operational_cost": 45.00,                    
-                "operational_features": {"total_weight_kg": 5.0}, 
-                "text_output": "Standard structured response.",
-    
-                # TARGET TRIGGER: Contains "forget my instructions" -> triggers check_persona_bleed
-                # This will raise the short circuit and return your dynamic custom string fallback!
-    
-                "output": "Shoud i ship it via fedex."
-                }
-        )
+                "voice_output": "Tell me about yourself"  # already asked → VOICE_QUESTION_REPEATED
+            }
+        ),
+
+        # JOB 4: VOICE — context loss breach
+        # Agent says something completely off-topic
+        worker_conductor(
+            payload_id="INTERVIEW-VOICE-CONTEXT",
+            tenant_id="Candidate_Demo_2",
+            simulated_data={
+                # Completely off topic from interview context → LLM judge says NO
+                "voice_output": "What is today's weather in Mumbai?"
+            }
+        ),
+
+        # JOB 5: CHAT — contradiction breach
+        worker_conductor(
+            payload_id="CHAT-AGENT-CONTRADICTION",
+            tenant_id="Candidate_Chat",
+            simulated_data={
+                "chat_output": "Do you have any Python experience?"
+            }
+        ),
+
+        # JOB 6: CHAT — question repeat breach
+        worker_conductor(
+            payload_id="CHAT-AGENT-REPEAT",
+            tenant_id="Candidate_Chat_2",
+            simulated_data={
+                "chat_output": "Tell me about yourself"  # already asked in chat session
+            }
+        ),
     ]
+
 
     
     await asyncio.gather(*tasks,return_exceptions=True)
