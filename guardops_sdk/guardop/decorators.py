@@ -48,7 +48,6 @@ def guard_runtime(node_name:str,**decorator_kwargs):
  
 
 
-
             raw_input_snapshot = copy.deepcopy(payload)
          
             waybill_id=payload.get("payload_id","UNKNOWN")

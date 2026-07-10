@@ -8,6 +8,8 @@ Most safety tools analyze outputs **after** the pipeline
 completes. GuardOps intercepts **during** execution, at 
 every node boundary.
 
+## Live Demo Output: https://drive.google.com/file/d/1WN7BSiIECRDCQpWGIpe_Z3tG32L5jruL/view?usp=sharing
+
 ---
 
 ## What It Does
@@ -218,7 +220,7 @@ MLFLOW_TRACKING_URI=http://localhost:5000
 ```
 
 ```bash
-python workers.py
+python -m workers.py
 ```
 
 ---
@@ -294,8 +296,8 @@ framework agnostic.
 
 
 ## Langfuse Observability
-![Langfuse Spans](guardops_sdk\assets\guardops_4.png)
+![Langfuse Spans](guardops_sdk/assets/guardops_4.png)
 
 
 ## MLflow Retraining Artifacts
-![MLflow Artifacts](guardops_sdk\assets\guardops_6.png)
+![MLflow Artifacts](guardops_sdk/assets/guardops_6.png)
