@@ -165,7 +165,8 @@ async def main_entry():
             payload_id="JOB-002-OVERRIDE-RUN", 
             tenant_id="Tenant_Enterprise_C", 
             simulated_data={
-                "text_output": "Malformed text output string"
+                "text_output": "Malformed text output string",
+                "voice_output": "Tell me about yourself"  
             }
         ), 
         

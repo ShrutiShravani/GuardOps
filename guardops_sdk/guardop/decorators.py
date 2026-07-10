@@ -171,6 +171,9 @@ def guard_runtime(node_name:str,**decorator_kwargs):
             
             except GuardOpsRefusalIntercept as intercept:
                 execution_id =str(uuid.uuid4())
+                
+                parent_trace_id= GuardTelemetry.get_active_trace()
+                client= GuardTelemetry.get_global_client()
             
                 GuardTelemetry.start_trace_session(trace_name=f"UniversalPipeline_{execution_id}",user_id=user_id,tags=["Production-Runtime-Shield", "Architecture-v1"])
 

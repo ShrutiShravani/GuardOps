@@ -1,563 +1,46 @@
-# 🛡️ GuardOps: Multi-Agent Telemetry & Real-Time Policy Guardrails
+# GuardOps — Runtime Safety Proxy for Multi-Agent Systems
 
-GuardOps is a high-performance, production-grade security and compliance proxy layer engineered specifically for **Multi-Agent Systems (MAS)**. It acts as an inline runtime proxy that intercepts data streams between decoupled agent nodes in real-time. By dynamically validating state transitions, GuardOps enforces automated corrections (`DATA_OVERRIDE`) or instantly halts dangerous trajectories (`SHORT_CIRCUIT`) before corruption can cascade across your agent ecosystem.
+GuardOps is a production-grade inline proxy that intercepts 
+payloads between AI agent nodes in real-time — before 
+failures cascade across your system.
 
-By natively pairing **OpenTelemetry (via Langfuse v4)** with **Experiment & Retraining Artifact Tracking (via MLflow)**, GuardOps transforms black-box agent behaviors into a completely deterministic, auditable, and observable engineering pipeline.
-
-## NOTE: Supported State Formats
-
-GuardOps currently operates on dictionary-based state objects.
-
-### Supported
-
-- ✅ `dict`
-- ✅ `TypedDict` (recommended for LangGraph workflows)
-
-Example:
-
-```python
-from typing import TypedDict
-
-class AgentState(TypedDict):
-    query: str
-    result: str
-
-@guard_runtime(node_name="planner")
-def planner_node(state: AgentState):
-    return state
-```
-
-### Currently Unsupported
-
-- ❌ Pydantic models (`BaseModel`)
-- ❌ Dataclasses (`@dataclass`)
-- ❌ Custom Python classes
-
-Examples:
-
-```python
-from pydantic import BaseModel
-
-class AgentState(BaseModel):
-    query: str
-```
-
-```python
-from dataclasses import dataclass
-
-@dataclass
-class AgentState:
-    query: str
-```
-
-```python
-class AgentState:
-    def __init__(self):
-        self.query = ""
-```
-
-### Why?
-
-GuardOps is currently optimized for LangGraph-style workflows, where state is typically represented as a `dict` or `TypedDict`. Support for additional state representations may be added in future releases
+Most safety tools analyze outputs **after** the pipeline 
+completes. GuardOps intercepts **during** execution, at 
+every node boundary.
 
 ---
 
-## 🛠️ Why GuardOps? (Core Value Proposition)
+## What It Does
 
-Traditional LLM validation frameworks operate entirely downstream *after* a multi-agent orchestration assembly has completed its pass. In complex, multi-turn agent networks, this latent approach is fundamentally broken:
+When a policy breach is detected, GuardOps takes one of 
+two actions:
 
-* 🚨 **Cascading Failures:** A single persona bleed or context drift in a routing agent propagates toxic, hallucinated, or non-compliant states directly to downstream execution blocks.
-* 📉 **Telemetry Blindspots:** Post-facto evaluation strips out execution context, making it incredibly difficult to isolate which node inside a **Directed Acyclic Graph (DAG)** initiated a compliance breach.
+- **DATA_OVERRIDE** — Mutates the corrupted field in-place 
+  and lets the pipeline continue with clean state
+- **SHORT_CIRCUIT** — Raises `GuardOpsRefusalIntercept`, 
+  halts the entire pipeline instantly, saves the failure 
+  state for retraining
 
-GuardOps solves this by embedding validation directly into the runtime layer of individual orchestration steps, acting as a fine-grained firewall for every node in your topology.
-
-
----
-
-## ⚙️ Key Technical Capabilities
-
-### 🔀 Inline Interception & Mutation
-The engine captures inbound and outbound dictionary payloads mid-execution. When a soft operational rule triggers a breach, GuardOps intercepts the data stream and safely forces an absolute mutation (`DATA_OVERRIDE`) on the corrupted field, allowing downstream agents to continue processing clean, validated states.
-
-### 🛑 Deterministic Short-Circuiting
-For fatal compliance or behavioral violations, GuardOps executes a `SHORT_CIRCUIT` strategy. It intercepts execution, halts the agent node pathway instantly by raising a deterministic exception (`GuardOpsRefusalIntercept`), marks the global complete state.
-
-### 📊 Dual-Engine Telemetry Tracking
-GuardOps splits operational instrumentation across two specialized enterprise engines to ensure comprehensive observability:
-
-| Tracking Engine | Purpose & Telemetry Strategy | Captured Observability Data |
-| :--- | :--- | :--- |
-| **`Langfuse v4`** | **Live Span & Quality Observation** | Records step-by-step nested open-telemetry spans, maps exact mutation diffs (`applied_mutations`), and registers binary execution quality metrics (`Data_Override` / `Short_Circuit` scores). |
-| **`MLflow Engine`** | **Operational Dashboards & Retraining Pipelines** | Emits atomic metric telemetry indicators to track continuous regression, updates system run parameters, and isolates exact corrupted data snapshots into a secure local artifact directory (`mlflow_retrain_data/`) for fine-tuning loops. |
+Every breach is dual-logged:
+- **Langfuse v4** — Live nested spans, mutation diffs, 
+  intervention metadata
+- **MLflow** — Breach artifacts saved to 
+  `mlflow_retrain_data/` for regression testing and 
+  fine-tuning loops
 
 ---
 
-👉 **Want to try GuardOps immediately? Jump to the [How to Run](#-how-to-run) section.**
-
-
-WORKFLOW:
-
- ┌────────────────────────────┐
-                │   USER PROJECT FOLDER      │
-                │  guard_manifest.json       │
-                │  custom_guards.py          │
-                └────────────┬───────────────┘
-                             │
-                             ▼
-        ┌────────────────────────────────────┐
-        │        GUARDOPS LOADER             │
-        │  - manifest discovery              │
-        │  - function resolution             │
-        │  - validation                     │
-        └────────────┬───────────────────────┘
-                             │
-                             ▼
-        ┌────────────────────────────────────┐
-        │        POLICY ENGINE (VM)          │
-        │  - evaluates rules                 │
-        │  - executes custom checks          │
-        │  - applies overrides              │
-        │  - emits interventions             │
-        └────────────┬───────────────────────┘
-                             │
-                             ▼
-        ┌────────────────────────────────────┐
-        │      DECORATOR / RUNTIME WRAPPER   │
-        │  - wraps node execution           │
-        │  - captures payload diff          │
-        │  - triggers engine                │
-        └────────────┬───────────────────────┘
-                             │
-                             ▼
-        ┌────────────────────────────────────┐
-        │   OBSERVABILITY LAYER              │
-        │  - Langfuse spans                 │
-        │  - MLflow artifacts               │
-        │  - Scores (optional)              │
-        └────────────────────────────────────┘
-
----
-
-##Rule Configuration Manifests (`manifest.json`)
-
-The entire operational runtime routing of GuardOps is governed completely by a centralized policy layout file: `manifest.json`. The configuration schema is designed to allow developers to deploy out-of-the-box static parameters or plug in complex, custom-coded Python micro-policies seamlessly.
-
-### Core Required Structural Parameters
-
-Every single configuration object must declare these core architectural variables:
-
-* **`metric_key`**: The specific key target inside the execution dictionary context. This supports dot-notation (e.g., `parent.child.target_key`) to seamlessly parse deeply nested payload dictionaries.
-* **`condition_type`**: The internal validation parsing directive. The core engine exposes four production modes natively:
-  * **`UNDER_FLOOR`**: Asserts that numeric states do not drop below a specific baseline value limit.
-  * **`OVER_CEILING`**: Asserts that numeric states do not cross an upper bound limit.
-  * **`REGEX_MISMATCH`**: Validates that string text streams conform strictly to an exact structural format pattern or schema boundary.
-  * **`CUSTOM_CHECK`**: Instructs the execution engine to dynamically resolve and delegate evaluation tasks to custom-written Python functions.
-* **`boundary_limit`**: The evaluation barrier rule. For native numerical/text modes, this is written as a direct static literal. For custom functions, this is defined as a fully qualified module string lookup reference (`file_name.function_name`).
-* **`fallback_value`**: The immediate programmatic replacement value injected into the payload when a policy breach triggers. This accepts a **static literal** (integer, string, array, object) or a **dynamic functional module route path** (`file_name.generator_name`) to generate fallback strings on the fly.
-* **`strategy`**: The mitigation enforcement action taken upon a breach event. Must match either **`"DATA_OVERRIDE"`** or **`"SHORT_CIRCUIT"`**.
-* **`breach_tag`**: A unique tracking label string used to index and serialize the specific violation across Langfuse span tracking contexts, MLflow dashboard parameters, and artifact retrain files.
-
----
-
-### 📊 Manifest Execution Breakdown Matrix
-
-To map your logic requirements perfectly to the configuration engine, use the reference grid below:
-
-| Target Use Case | Required `condition_type` | How to Declare `boundary_limit` | How to Declare `fallback_value` |
-| :--- | :--- | :--- | :--- |
-| **Numeric Floor Enforcement** | `"UNDER_FLOOR"` | Pass raw float/integer bounds parameter (`5.00`) | Pass raw float/integer value recovery parameter (`5.00`) |
-| **Numeric Ceiling Halted Traces** | `"OVER_CEILING"` | Pass raw float/integer bounds parameter (`500.00`) | Pass standard text error message string block |
-| **Deep Object Path Nested Check** | `"OVER_CEILING"` | Set dot-notation traversal string on `metric_key` | Pass target fallback data match value directly |
-| **Silent Schema Format Scans** | `"REGEX_MISMATCH"` | Define compiled system Regex pattern raw string | Define static JSON recovery fallback schema string |
-| **Custom Code & Function Fallbacks** | `"CUSTOM_CHECK"` | Route to validation script: `"custom_guards.check_persona_bleed"` | Route to generation code: `"custom_guards.dynamic_voice_persona_fallback"` |
-| **Custom Code with Flat Fallbacks** | `"CUSTOM_CHECK"` | Route to validation script: `"custom_guards.check_competitor_leak"` | Write static string text variable straight into JSON configuration file |
-
-### The Complete Complete Blueprint Manifest Blueprint
-
-To fully understand how native checking, nested dot-notation paths, raw values, and functional routes interoperate, review the production-grade blueprint schema example from the repository root:
-
-```json
-{
-  "CriticAgent": [
-    {
-      "metric_key": "predicted_base_price",
-      "condition_type": "UNDER_FLOOR",
-      "boundary_limit": 5.00,
-      "fallback_value": 5.00,
-      "strategy": "DATA_OVERRIDE",
-      "breach_tag": "INDIVIDUAL_PRICE_UNDER_FLOOR"
-    },
-    {
-      "metric_key": "operational_cost",
-      "condition_type": "OVER_CEILING",
-      "boundary_limit": 500.00,
-      "fallback_value": "Cost ceiling exceeded. Request blocked.",
-      "strategy": "SHORT_CIRCUIT",
-      "breach_tag": "OPERATIONAL_COST_EXCEEDS_MAX_BUDGET"
-    },
-    {
-      "metric_key": "operational_features.total_weight_kg",
-      "condition_type": "OVER_CEILING",
-      "boundary_limit": 150.0,
-      "fallback_value": 150.0,
-      "strategy": "DATA_OVERRIDE",
-      "breach_tag": "NESTED_CLUSTER_WEIGHT_LIMIT_EXCEEDED"
-    }
-  ],
-  "LLM_Output_Generation_Node": [
-    {
-      "metric_key": "llm_generation.text_output",
-      "condition_type": "REGEX_MISMATCH",
-      "boundary_limit": "^{.*\"waybill_id\":\\s*\"WB-[0-9]{4}-[A-Z]{3}\".*}$",
-      "fallback_value": "{\"status\": \"FALLBACK_STRUCTURAL_RECOVERY\", \"waybill_id\": \"WB-0000-FAILED\"}",
-      "strategy": "DATA_OVERRIDE",
-      "breach_tag": "PROVIDER_SILENT_SCHEMA_SHIFT_DETECTED"
-    }
-  ],
-  "Voice_Generation_Node": [
-    {
-      "metric_key": "voice_generation.output",
-      "strategy": "DATA_OVERRIDE",
-      "checks": [
-        {
-          "condition_type": "CUSTOM_CHECK",
-          "boundary_limit": "custom_guards.check_persona_bleed",
-          "fallback_value": "custom_guards.dynamic_voice_persona_fallback",
-          "breach_tag": "INTERVIEWER_PERSONA_BLEED_DETECTED"
-        },
-        {
-          "condition_type": "CUSTOM_CHECK",
-          "boundary_limit": "custom_guards.check_competitor_leak",
-          "fallback_value": "As an internal assistant, I am optimized to discuss our shipping networks.",
-          "breach_tag": "COMPETITOR_LEAK_SABOTAGE"
-        }
-      ]
-    }
-  ]
-}
-```
-
----
-
-### Writing Extensible Custom Guards (`custom_guards.py`)
-
-
-When the built-in numeric or regex validation parameters do not suffice, GuardOps allows you to plug in highly tailored Python verification policies. This is achieved by setting your manifest's `condition_type` to `"CUSTOM_CHECK"` and routing the `boundary_limit` directly to your Python file.
-
-### 📜 The Structural Function Contract
-
-Every custom validation function and dynamic fallback generator must adhere to a strict positional argument signature. If this contract is broken, the core engine will fail to route runtime payload data into your logic correctly.
-
-
-#### 1. Custom Check Function Signature
-
-```python
-def your_check_name(value: Any, rule_config: dict) -> bool:
-    pass
-```
-
-- **`value`**: The data extracted dynamically from the runtime payload using the manifest's declared `metric_key`.
-- **`rule_config`**: A serialized dictionary containing all configuration values associated with the current rule.
-- **Expected Return (`bool`)**:
-  - Return `True` to declare a policy breach.
-  - Return `False` to indicate the value passed validation successfully.
-
----
-
-### 💻 Production Blueprint Example (`custom_guards.py`)
-
-Create a file named `custom_guards.py` in your project root and implement your custom validation logic as shown below:
-
-```python
-from typing import Any, Dict
-
-# ====================================================================
-# 1. CUSTOM SYSTEM COMPLIANCE VERIFICATION GUARDS
-# ====================================================================
-
-def check_persona_bleed(value: Any, rule_config: Dict[str, Any]) -> bool:
-    """
-    Detects persona drift or prompt-injection style behavior.
-    """
-    text_to_check = str(value).lower().strip()
-
-    test_phrases = [
-        "leave it",
-        "just answer",
-        "forget my instructions",
-        "ignore previous directives"
-    ]
-
-    if any(phrase in text_to_check for phrase in test_phrases):
-        print(
-            f"[GUARD INTERCEPT] Breach detected: "
-            f"{rule_config.get('breach_tag')}"
-        )
-        return True
-
-    return False
-
-
-def check_competitor_leak(value: Any, rule_config: Dict[str, Any]) -> bool:
-    """
-    Prevents internal systems from leaking competitor references.
-    """
-    text_to_check = str(value).lower().strip()
-
-    competitors = ["fedex", "ups", "dhl"]
-
-    if any(company in text_to_check for company in competitors):
-        print(
-            f"[GUARD INTERCEPT] Competitor leak detected: "
-            f"{rule_config.get('breach_tag')}"
-        )
-        return True
-
-    return False
-
-
-def verify_pricing_limits(value: Any, rule_config: Dict[str, Any]) -> bool:
-    """
-    Validates pricing boundaries.
-    """
-    try:
-        price = float(value)
-
-        if price <= 0.0 or price > 10000.0:
-            return True
-
-    except (ValueError, TypeError):
-        return True
-
-    return False
-
-
-# ====================================================================
-# 2. DYNAMIC FALLBACK DATA GENERATORS
-# ====================================================================
-
-def dynamic_voice_persona_fallback(
-    current_value: Any,
-    rule_config: Dict[str, Any]
-) -> str:
-    """
-    Generates a safe replacement response when persona drift is detected.
-    """
-
-    print(
-        f"[FALLBACK LOGIC] Recovering metric: "
-        f"{rule_config.get('metric_key')}"
-    )
-
-    return (
-        "System Note: Secure assistant context restored. "
-        "Please describe your shipping requirements."
-    )
-```
-
----
-
-### 🧩 Mapping Your Code to the Manifest
-
-Once your `custom_guards.py` file is created, reference the functions directly from your manifest using dot-notation paths.
-
-```json
-{
-  "Voice_Generation_Node": [
-    {
-      "metric_key": "voice_generation.output",
-      "strategy": "DATA_OVERRIDE",
-      "condition_type": "CUSTOM_CHECK",
-      "boundary_limit": "custom_guards.check_persona_bleed",
-      "fallback_value": "custom_guards.dynamic_voice_persona_fallback",
-      "breach_tag": "INTERVIEWER_PERSONA_BLEED_DETECTED"
-    },
-    {
-      "metric_key": "voice_generation.output",
-      "strategy": "DATA_OVERRIDE",
-      "condition_type": "CUSTOM_CHECK",
-      "boundary_limit": "custom_guards.check_competitor_leak",
-      "fallback_value": "As an internal logistics assistant, I am optimized to discuss our shipping networks.",
-      "breach_tag": "COMPETITOR_LEAK_SABOTAGE"
-    }
-  ]
-}
-```
-
-GuardOps automatically resolves these references at runtime:
-
-```text
-custom_guards.check_persona_bleed
-          ↓
-custom_guards.py
-          ↓
-check_persona_bleed(...)
-```
-
-No manual registration is required.
-
----
-
-## 🔌 Framework Integration
-
-GuardOps is framework-agnostic.
-
-Whether you use LangGraph, CrewAI, Autogen, OpenAI Agents SDK, or custom orchestration code, GuardOps operates at the Python function boundary through the `@guard_runtime(...)` decorator.
-
-### LangGraph Example
-
-```python
-from typing import TypedDict
-from langgraph.graph import StateGraph
-from guardops_sdk import guard_runtime
-
-
-class AgentGraphState(TypedDict):
-    payload_id: str
-    mlflow_run_id: str
-    predicted_base_price: float
-    operational_cost: float
-    status: str
-
-
-@guard_runtime("CriticAgent")
-async def verify_financial_node(
-    state: AgentGraphState
-) -> AgentGraphState:
-
-    print("Validating financial state...")
-    return state
-
-
-workflow = StateGraph(AgentGraphState)
-
-workflow.add_node(
-    "financial_critic",
-    verify_financial_node
-)
-
-```
-# Add conditional edges, set entry points, and compile...
-
-
-## 🚀 How to Run
-
-> ⚠️ **Development Note:** GuardOps is currently a localized architectural framework and has **not yet been packaged as a downloadable Python library**. To evaluate or execute the framework, clone the repository and run the source code locally.
-
----
-
-### 1. Clone the Repository
-
-Pull the source code and navigate into the project directory.
-
-```bash
-git clone https://github.com/ShrutiShravani/GuardOps.git
-cd GuardOps
-```
-
----
-
-### 2. Installation Requirements
-
-Install all required dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-#### Core Dependencies
-
-If setting up manually, install the required packages:
-
-```bash
-pip install mlflow langfuse openinference-instrumentation-langchain opentelemetry-api pydantic python-dotenv
-```
-
----
-
-### ⚙️ Environment Configuration (`.env`)
-
-Create a `.env` file in the project root containing your telemetry and tracking credentials.
-
-```env
-# ====================================================================
-# GuardOps Infrastructure Configuration
-# ====================================================================
-
-# Langfuse Configuration
-LANGFUSE_PUBLIC_KEY=pk-lf-...
-LANGFUSE_SECRET_KEY=sk-lf-...
-LANGFUSE_HOST=https://cloud.langfuse.com
-
-# MLflow Tracking Server
-MLFLOW_TRACKING_URI=http://localhost:5000
-```
-
-The GuardOps runtime automatically loads these environment variables during initialization.
-
----
-
-### 3. Initialize Required Runtime Assets
-
-Before starting the framework, verify the following files exist in your working directory:
-
-* `guard_manifest.json` — Centralized policy routing configuration
-* `custom_guards.py` — Custom validation functions and dynamic fallbacks
-* `workers.py` — Pipeline worker execution entrypoint
-
-Example project structure:
-
-```text
-GuardOps/
-│
-├── .env
-├── guard_manifest.json
-├── custom_guards.py
-├── workers.py
-│
-└── guardops_sdk/
-```
-
----
-
-### 4. Execute the Simulation Engine
-
-Once your environment and policy assets are configured, launch the worker pipeline:
-
-```bash
-python workers.py
-```
-
----
-
-### 5. Expected Console Output
-
-During execution, GuardOps continuously evaluates payloads and applies runtime safety policies.
-
-Example output:
-
-```text
-🔄 Worker processing job pipeline sequence for: JOB-001-CLEAN
-🔄 Worker processing job pipeline sequence for: JOB-002-OVERRIDE-RUN
-🔄 Worker processing job pipeline sequence for: JOB-003-BUDGET-SHORT
-🔄 Worker processing job pipeline sequence for: INTERVIEW-SHRUTI-01
-
-[NODE EXECUTION] LLM_Output_Generation_Node evaluating rules...
-[NODE EXECUTION] Voice_Generation_Node validating persona...
-
-[GUARD INTERCEPT] Proprietary Leaks Blocked: COMPETITOR_LEAK_SABOTAGE
-
-[BYPASS TRIGGERED] Short-Circuit at CriticAgent. Halting execution pipeline.
-[BYPASS TRIGGERED] Short-Circuit at Voice Generation Node. Halting execution pipeline.
-
-✅ Worker complete for JOB-001-CLEAN -> Safety Status: COMPLETED_SUCCESSFULLY
-
-[TELEMETRY COMPLETE] All metrics and traces streamed to Langfuse and MLflow.
-```
-
----
-
-### 6. Runtime Execution Flow
+## How It Works
+
+### User defines:
+- **guard_manifest.json**  ← which node, what to check, what action to take
+- **custom_guards.py**      ← their business logic
+- ### GuardOps handles:
+  * **Runtime interception**  ← @guard_runtime decorator
+  *  **Policy evaluation**     ← engine resolves rules
+  * **Telemetry**             ← Langfuse + MLflow automatic
+
+### Runtime Execution Flow
 
 When a decorated agent executes, GuardOps wraps the complete lifecycle:
 
@@ -592,67 +75,227 @@ When a decorated agent executes, GuardOps wraps the complete lifecycle:
               ├── Saves retraining artifacts
               └── Returns safe failure response
 ```
-
 ---
+### The Decorator
 
-## 🚀 Enterprise GuardOps Scaling Roadmap
-
-The current architecture establishes a low-latency runtime safety layer integrated with Langfuse and MLflow. Future iterations are designed to support enterprise-scale deployments.
-
-### 1.Stateless Context Injection (The Resume Scalability Story)
-* Completely removing the static configuration file and moving the policy boundaries directly into a payload["guard_policies"] contract block. To scale the system for true enterprise multi-tenancy,i will move GuardOps from a static configuration model to a stateless context-injection pattern. Instead of hardcoding blanket limits, an API gateway fetches tenant-specific thresholds from a high-speed cache and dynamically appends them to the transactional payload. This keeps the execution decorators entirely stateless and isolates rule enforcement perfectly per customer."
-
-### 2. Decoupled Custom Guard Directories
-
-* Move beyond a single `custom_guards.py` file.
-* Support modular guard packages:
-
-```text
-guards/
-├── security/
-├── compliance/
-├── finance/
-└── operations/
+```python
+@guard_runtime(node_name="CriticAgent")
+async def critic_node(payload: dict) -> dict:
+    return payload  # GuardOps intercepts automatically
 ```
 
-* Automatically discover and register guard modules at startup.
-
----
-
-### 3. Full Multi-Agent DAG Interception
-
-* Native support for complex DAG-based agent workflows.
-* Validate state transitions across multiple agent boundaries.
-* Enable end-to-end orchestration protection:
-
-```text
-Routing Agent
-      ↓
-Pricing Agent
-      ↓
-Risk Agent
-      ↓
-Auditor Agent
-```
-
-Each node can independently enforce GuardOps policies.
-
----
-
-### 4. Manifest Parameterization & Centralized Control
-
-* Move thresholds and evaluation parameters into manifests.
-* Support JSON and YAML policy definitions.
-* Enable zero-code policy updates without redeployment.
-
-Example:
+### The Manifest
 
 ```json
 {
-  "boundary_limit": 5000,
-  "fallback_value": 2500,
-  "breach_tag": "PRICE_LIMIT_EXCEEDED"
+  "CriticAgent": [
+    {
+      "metric_key": "predicted_base_price",
+      "condition_type": "UNDER_FLOOR",
+      "boundary_limit": 5.00,
+      "fallback_value": 5.00,
+      "strategy": "DATA_OVERRIDE",
+      "breach_tag": "PRICE_UNDER_FLOOR"
+    },
+    {
+      "metric_key": "operational_cost",
+      "condition_type": "OVER_CEILING",
+      "boundary_limit": 500.00,
+      "fallback_value": "Cost ceiling exceeded.",
+      "strategy": "SHORT_CIRCUIT",
+      "breach_tag": "BUDGET_EXCEEDED"
+    }
+  ],
+  "Voice_Generation_Node": [
+    {
+      "metric_key": "output",
+      "strategy": "DATA_OVERRIDE",
+      "checks": [
+        {
+          "condition_type": "CUSTOM_CHECK",
+          "boundary_limit": "custom_guards.check_question_repeat",
+          "fallback_value": "custom_guards.recover_next_question",
+          "breach_tag": "VOICE_QUESTION_REPEATED",
+          "parameters": {
+            "session_id": "interview_001",
+            "question_bank": ["Tell me about yourself", "..."]
+          }
+        },
+        {
+          "condition_type": "CUSTOM_CHECK",
+          "boundary_limit": "custom_guards.check_context_loss",
+          "fallback_value": "custom_guards.recover_context_anchor",
+          "breach_tag": "VOICE_CONTEXT_LOST",
+          "parameters": { "session_id": "interview_001" }
+        }
+      ]
+    }
+  ]
 }
 ```
 
-This allows operators to modify policies without changing application code.
+### Custom Guards
+
+```python
+def check_question_repeat(value: Any, rule_config: dict) -> bool:
+    # return True = breach, False = pass
+    scores = cosine_similarity(embed(value), embed(past_questions))
+    return float(max(scores)) > 0.82
+
+def recover_next_question(value: Any, rule_config: dict) -> str:
+    # return the fallback value to inject
+    return next_unasked_question_from_bank
+```
+
+---
+
+## Supported Condition Types
+
+| Type | Use Case |
+|---|---|
+| `UNDER_FLOOR` | Numeric minimum enforcement |
+| `OVER_CEILING` | Numeric maximum enforcement |
+| `REGEX_MISMATCH` | Schema/format validation |
+| `CUSTOM_CHECK` | Any custom Python logic |
+
+---
+
+## Real-World Use Cases Demonstrated
+
+**Multi-Agent Logistics Pipeline**
+- Price floor enforcement across agent nodes
+- Weight ceiling with nested dot-notation 
+  (`operational_features.total_weight_kg`)
+- LLM schema drift detection via regex
+
+**Voice Interview Agent**
+- Repeated question detection via embedding 
+  similarity (score 1.00 → breach)
+- Context loss detection via LLM-as-judge 
+  (GPT-4o-mini coherence check)
+- Session-aware — tracks full conversation 
+  history across turns
+
+**Chat Interview Agent**
+- Contradiction detection against stored 
+  candidate facts
+- Question repeat with semantic similarity
+- Context loss with conversation history
+
+---
+
+## Telemetry Architecture
+* **Every breach** →
+Langfuse:  nested span with input/output diff
+MLflow:    artifact JSON saved for retraining
+{
+"breached_input": original payload,
+"applied_output": what GuardOps did
+}
+
+This creates a **data flywheel** — every failure 
+automatically generates a labeled training example 
+for the next model version.
+
+---
+
+## Installation
+
+```bash
+git clone https://github.com/ShrutiShravani/GuardOps
+cd GuardOps
+pip install -r requirements.txt
+```
+
+`.env` required:
+# Langfuse Configuration
+LANGFUSE_PUBLIC_KEY=pk-lf-...
+LANGFUSE_SECRET_KEY=sk-lf-...
+LANGFUSE_HOST=https://cloud.langfuse.com
+
+# MLflow Tracking Server
+MLFLOW_TRACKING_URI=http://localhost:5000
+```
+
+```bash
+python workers.py
+```
+
+---
+
+## Supported Frameworks
+
+Works at the Python function boundary — 
+framework agnostic.
+
+✅ LangGraph  ✅ CrewAI  ✅ AutoGen  
+✅ OpenAI Agents SDK  ✅ Custom pipelines
+
+---
+
+## Current Limitations
+
+- Dictionary and TypedDict state only
+- Pydantic BaseModel not yet supported
+
+---
+
+## Roadmap
+
+**Near-term — already architected:**
+
+- **Logprob confidence interception** — use 
+  token-level probability scores from LLM APIs 
+  as lightweight hallucination signals. 
+  Eliminates the LLM-as-judge API call entirely.
+
+- **Adaptive threshold tuning** — MLflow breach 
+  logs feed back into threshold calibration. 
+  System observes false positive rate and adjusts 
+  similarity thresholds automatically per domain.
+
+- **Modular guard packages** — move beyond single 
+  `custom_guards.py` to auto-discovered guard 
+  directories per domain (finance/, security/, 
+  compliance/)
+
+**Protocol-level (emerging standards):**
+
+- **MCP integration** — expose GuardOps guard 
+  tools as MCP server endpoints. LLMs connect 
+  via standard protocol, no custom wiring needed.
+
+- **A2A state passing** — as Google's Agent2Agent 
+  protocol matures, GuardOps validated state 
+  passes between agent nodes via standardized 
+  task objects instead of raw dict payloads.
+
+**Production scale:**
+
+- **Real-time audio stream interception** — 
+  current voice interception fires after STT, 
+  before TTS. Future: intercept raw audio frames 
+  mid-generation, cut before user hears broken 
+  output. Sub-50ms.
+
+- **Causal tracing** — current system catches 
+  bad outputs. Future: trace upstream cause — 
+  which retrieval chunk, which turn, which STT 
+  token caused the failure. MLflow already 
+  captures the breach timestamp; upstream signal 
+  logging is the next instrumentation layer.
+
+- **Stateless multi-tenant injection** — move 
+  from static manifest to per-request policy 
+  injection via `payload["guard_policies"]`. 
+  API gateway fetches tenant-specific thresholds 
+  from cache and appends dynamically. Zero 
+  redeployment for policy changes.
+
+
+## Langfuse Observability
+![Langfuse Spans](guardops_sdk\assets\guardops_4.png)
+
+
+## MLflow Retraining Artifacts
+![MLflow Artifacts](guardops_sdk\assets\guardops_6.png)
