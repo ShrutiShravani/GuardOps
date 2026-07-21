@@ -1,0 +1,45 @@
+
+{
+    "RAG_Answer_Node": [
+      {
+        "metric_key": "retrieval_score",
+        "strategy": "SHORT_CIRCUIT",
+        "checks": [
+          {
+            "condition_type": "UNDER_FLOOR",
+            "boundary_limit": 0.70,
+            "fallback_value": "I don't have enough verified information to answer that confidently. Could you rephrase, or would you like me to connect you with a human agent?",
+            "breach_tag": "LOW_RETRIEVAL_CONFIDENCE",
+            "parameters": {}
+          }
+        ]
+      },
+      {
+        "metric_key": "answer",
+        "strategy": "SHORT_CIRCUIT",
+        "checks": [
+          {
+            "condition_type": "CUSTOM_CHECK",
+            "boundary_limit": "custom_guards.check_hallucination",
+            "fallback_value": "I can only answer based on verified documentation. I wasn't able to find a reliable source for that — let me escalate this to the support team.",
+            "breach_tag": "HALLUCINATION_DETECTED",
+            "parameters": {}
+          }
+        ]
+      },
+      {
+        "metric_key": "answer",
+        "strategy": "DATA_OVERRIDE",
+        "checks": [
+          {
+            "condition_type": "CUSTOM_CHECK",
+            "boundary_limit": "custom_guards.check_pii_leak",
+            "fallback_value": "custom_guards.recover_redacted_answer",
+            "breach_tag": "PII_IN_ANSWER",
+            "parameters": {}
+          }
+        ]
+      }
+    ]
+  }
+  

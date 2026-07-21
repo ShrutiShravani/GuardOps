@@ -1,0 +1,37 @@
+{
+    "Chat_Generation_Node": [
+      {
+        "metric_key": "chat_output",
+        "strategy": "DATA_OVERRIDE",
+        "checks": [
+          {
+            "condition_type": "CUSTOM_CHECK",
+            "boundary_limit": "custom_guards.check_question_repeat",
+            "fallback_value": "custom_guards.recover_next_question",
+            "breach_tag": "CHAT_QUESTION_REPEATED",
+            "parameters": {
+              "session_id": "chat_session_001",
+              "similarity_threshold": 0.82,
+              "question_bank": [
+                "Tell me about yourself",
+                "Walk me through a system design you are proud of",
+                "Describe a conflict with a teammate",
+                "What motivates you to work in this field",
+                "Tell me about a time you failed and what you learned"
+              ]
+            }
+          },
+          {
+            "condition_type": "CUSTOM_CHECK",
+            "boundary_limit": "custom_guards.check_contradiction",
+            "fallback_value": "custom_guards.recover_contradiction",
+            "breach_tag": "CHAT_CANDIDATE_CONTRADICTION",
+            "parameters": {
+              "session_id": "chat_session_001"
+            }
+          }
+        ]
+      }
+    ]
+  }
+  

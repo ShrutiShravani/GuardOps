@@ -1,0 +1,36 @@
+{
+    "Voice_Generation_Node": [
+      {
+        "metric_key": "voice_output",
+        "strategy": "DATA_OVERRIDE",
+        "checks": [
+          {
+            "condition_type": "CUSTOM_CHECK",
+            "boundary_limit": "custom_guards.check_question_repeat",
+            "fallback_value": "custom_guards.recover_next_question",
+            "breach_tag": "VOICE_QUESTION_REPEATED",
+            "parameters": {
+              "session_id": "voice_interview_001",
+              "similarity_threshold": 0.82,
+              "question_bank": [
+                "Tell me about yourself",
+                "Walk me through a system design you are proud of",
+                "Describe a conflict with a teammate",
+                "What is your approach to debugging production issues",
+                "Where do you see yourself in 5 years"
+              ]
+            }
+          },
+          {
+            "condition_type": "CUSTOM_CHECK",
+            "boundary_limit": "custom_guards.check_context_loss",
+            "fallback_value": "custom_guards.recover_context_anchor",
+            "breach_tag": "VOICE_CONTEXT_LOST",
+            "parameters": {
+              "session_id": "voice_interview_001"
+            }
+          }
+        ]
+      }
+    ]
+  }

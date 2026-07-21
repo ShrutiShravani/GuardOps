@@ -4,18 +4,57 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "guardops"
-version = "0.1.0"
-description = "Runtime guardrails for multi-agent workflows"
-readme = "README.md"
+version = "0.2.0"
+description = "Runtime safety proxy for multi-agent AI systems"
+readme = "readme.md"
 requires-python = ">=3.10"
+license = { text = "MIT" }
 
+# Core dependencies — required for the engine to work
 dependencies = [
-    "langfuse",
-    "mlflow",
     "python-dotenv",
-    "opentelemetry-api",
-    "pydantic"
 ]
 
-[tool.setuptools]
-packages = ["guardops"]
+[project.optional-dependencies]
+# Observability — enables Langfuse spans and MLflow retraining artifacts
+telemetry = [
+    "langfuse>=3.0",
+    "mlflow",
+    "opentelemetry-api",
+]
+# Semantic similarity in custom guards (e.g. question-repeat detection)
+embeddings = [
+    "sentence-transformers",
+]
+# LLM-as-judge custom checks
+llm = [
+    "openai>=1.0",
+]
+# Pydantic BaseModel payload support
+pydantic = [
+    "pydantic>=2.0",
+]
+# Everything
+all = [
+    "langfuse>=3.0",
+    "mlflow",
+    "opentelemetry-api",
+    "sentence-transformers",
+    "openai>=1.0",
+    "pydantic>=2.0",
+]
+# Development / testing
+dev = [
+    "pytest",
+    "pytest-asyncio",
+]
+
+[project.scripts]
+guardops = "guardops.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["guardops*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
